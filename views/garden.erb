@@ -458,8 +458,17 @@ function gardenDesigner(bedsData) {
         layer.appendChild(this._createSvgEl('polyline', {
           points: ptsStr, fill: 'none', stroke: '#365314', 'stroke-width': 1.5, 'stroke-dasharray': '5,3'
         }));
-        this.polyPoints.forEach(pt => {
-          layer.appendChild(this._createSvgEl('circle', { cx: pt[0], cy: pt[1], r: 4, fill: '#365314', opacity: 0.7 }));
+        this.polyPoints.forEach((pt, i) => {
+          const isFirst = i === 0 && this.polyPoints.length >= 3;
+          layer.appendChild(this._createSvgEl('circle', {
+            cx: pt[0], cy: pt[1],
+            r: isFirst ? 8 : 4,
+            fill: isFirst ? '#16a34a' : '#365314',
+            opacity: isFirst ? 0.9 : 0.7,
+            stroke: isFirst ? '#fff' : 'none',
+            'stroke-width': isFirst ? 2 : 0,
+            style: isFirst ? 'cursor: pointer;' : ''
+          }));
         });
       }
 
@@ -537,13 +546,35 @@ function gardenDesigner(bedsData) {
     },
 
     // ── SVG canvas events ────────────────────────────────────────────────────
+    _closePolygon() {
+      if (this.polyPoints.length >= 3) {
+        this.pendingShape = { type: 'polygon', points: [...this.polyPoints] };
+        this.polyPoints = [];
+        this.polyPreview = null;
+        this._polyLock = true;
+        setTimeout(() => { this._polyLock = false; }, 300);
+        this.$nextTick(() => this.$refs.newBedNameInput && this.$refs.newBedNameInput.focus());
+      }
+    },
+
     onSvgMouseDown(e) {
       if (this.activeTool === 'rect') {
         const [x, y] = this.svgPoint(e);
         this.drawRect = { startX: this.snap(x), startY: this.snap(y), x: this.snap(x), y: this.snap(y), w: 0, h: 0 };
       } else if (this.activeTool === 'polygon') {
+        if (this._polyLock) return; // prevent dblclick ghost clicks
         const [x, y] = this.svgPoint(e);
-        this.polyPoints.push([this.snap(x), this.snap(y)]);
+        const sx = this.snap(x), sy = this.snap(y);
+        // Close polygon if clicking near the first point (within 15px)
+        if (this.polyPoints.length >= 3) {
+          const [fx, fy] = this.polyPoints[0];
+          const dist = Math.sqrt((sx - fx) ** 2 + (sy - fy) ** 2);
+          if (dist < 15 / this.zoom) {
+            this._closePolygon();
+            return;
+          }
+        }
+        this.polyPoints.push([sx, sy]);
       } else if (this.activeTool === 'select') {
         this.selectedBed = null;
       }
@@ -554,11 +585,9 @@ function gardenDesigner(bedsData) {
     },
 
     onSvgDblClick(e) {
+      // Alternative way to close polygon — double-click anywhere
       if (this.activeTool === 'polygon' && this.polyPoints.length >= 3) {
-        this.pendingShape = { type: 'polygon', points: [...this.polyPoints] };
-        this.polyPoints = [];
-        this.polyPreview = null;
-        this.$nextTick(() => this.$refs.newBedNameInput && this.$refs.newBedNameInput.focus());
+        this._closePolygon();
       }
     },
 
