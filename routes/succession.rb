@@ -198,32 +198,45 @@ class GardenApp
     halt 400, "message required" if message.empty?
 
     require_relative "../services/planner_service"
+    require_relative "../services/garden_logger"
 
     content_type "text/event-stream"
-    headers "Cache-Control" => "no-cache", "Connection" => "keep-alive"
+    headers "Cache-Control" => "no-cache", "Connection" => "keep-alive", "X-Accel-Buffering" => "no"
 
-    stream(:keep_open) do |out|
-      service = PlannerService.new
+    stream do |out|
+      begin
+        # Send initial keepalive so the connection is established
+        out << ": connected\n\n"
 
-      service.send_message_streaming(message) do |event|
-        case event[:type]
-        when "chunk"
-          out << "data: #{JSON.generate({ type: "chunk", content: event[:content] })}\n\n"
-        when "draft"
-          out << "data: #{JSON.generate({ type: "draft", draft: event[:draft] })}\n\n"
-        when "done"
-          out << "data: #{JSON.generate({ type: "done" })}\n\n"
-          out.close
-        when "error"
-          out << "data: #{JSON.generate({ type: "error", content: event[:content] })}\n\n"
-          out.close
+        service = PlannerService.new
+
+        # Start a keepalive thread that sends SSE comments every 3s while tools execute
+        keepalive = Thread.new do
+          loop do
+            sleep 3
+            out << ": keepalive\n\n" rescue break
+          end
         end
+
+        service.send_message_streaming(message) do |event|
+          case event[:type]
+          when "chunk"
+            out << "data: #{JSON.generate({ type: "chunk", content: event[:content] })}\n\n"
+          when "draft"
+            out << "data: #{JSON.generate({ type: "draft", draft: event[:draft] })}\n\n"
+          when "done"
+            out << "data: #{JSON.generate({ type: "done" })}\n\n"
+          when "error"
+            out << "data: #{JSON.generate({ type: "error", content: event[:content] })}\n\n"
+          end
+        end
+
+        keepalive.kill
+      rescue => e
+        keepalive&.kill
+        GardenLogger.error "[Planner/SSE] Stream error: #{e.class}: #{e.message}"
+        out << "data: #{JSON.generate({ type: "error", content: e.message })}\n\n" rescue nil
       end
-    rescue => e
-      require_relative "../services/garden_logger"
-      GardenLogger.error "[Planner/SSE] Stream error: #{e.message}"
-      out << "data: #{JSON.generate({ type: "error", content: e.message })}\n\n" rescue nil
-      out.close rescue nil
     end
   end
 

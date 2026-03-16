@@ -34,12 +34,13 @@ module GardenLogger
       "category" => category,
       "summary" => summary,
       "detail" => detail,
-      "context" => context,
+      "context" => JSON.parse(JSON.generate(context)),  # stringify symbol keys
       "timestamp" => Time.now.iso8601,
       "status" => "open"
     }
 
-    File.write(filepath, content.to_yaml)
+    require "yaml"
+    File.write(filepath, YAML.dump(content))
     logger.error("GAP RECORDED: #{category} — #{summary} (#{filepath})")
     filepath
   end
