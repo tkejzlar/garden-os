@@ -27,28 +27,30 @@
     <!-- Messages -->
     <div x-ref="chatMessages" class="space-y-3 mb-3 overflow-y-auto" style="max-height: 50vh;">
       <template x-for="msg in messages" :key="msg.id || msg.created_at">
-        <!-- User message -->
-        <div x-show="msg.role === 'user'" class="flex justify-end">
-          <div class="rounded-xl px-4 py-2 text-sm max-w-[80%]" style="background: #d1fae5; color: var(--text-primary);" x-text="msg.content"></div>
-        </div>
-        <!-- AI message -->
-        <div x-show="msg.role === 'assistant'" class="flex justify-start">
-          <div class="rounded-xl px-4 py-3 text-sm max-w-[85%]" style="background: white; box-shadow: var(--card-shadow);">
-            <div x-html="msg.content.replace(/\n/g, '<br>') + (msg.streaming ? '<span class=\'streaming-cursor\'>▊</span>' : '')"></div>
-            <!-- Draft card if present -->
-            <template x-if="msg.draft">
-              <div class="mt-3 p-3 rounded-lg" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
-                <p class="text-xs font-semibold mb-2" style="color: #166534;">Plan Draft</p>
-                <p class="text-xs mb-1" x-text="(msg.draft.assignments?.length || 0) + ' bed assignments'"></p>
-                <p class="text-xs mb-1" x-text="(msg.draft.successions?.length || 0) + ' succession schedules'"></p>
-                <p class="text-xs mb-2" x-text="(msg.draft.tasks?.length || 0) + ' tasks'"></p>
-                <button @click="commitDraft(msg.draft)" :disabled="msg.committed"
-                  class="text-xs px-3 py-1.5 rounded-lg font-medium"
-                  :style="msg.committed ? 'background: #d1fae5; color: #166534;' : 'background: var(--green-900); color: white;'"
-                  x-text="msg.committed ? 'Plan created ✓' : 'Create this plan'">
-                </button>
-              </div>
-            </template>
+        <div>
+          <!-- User message -->
+          <div x-show="msg.role === 'user'" class="flex justify-end">
+            <div class="rounded-xl px-4 py-2 text-sm max-w-[80%]" style="background: #d1fae5; color: var(--text-primary);" x-text="msg.content"></div>
+          </div>
+          <!-- AI message -->
+          <div x-show="msg.role === 'assistant'" class="flex justify-start">
+            <div class="rounded-xl px-4 py-3 text-sm max-w-[85%]" style="background: white; box-shadow: var(--card-shadow);">
+              <div x-html="msg.content.replace(/\n/g, '<br>')"></div>
+              <!-- Draft card if present -->
+              <template x-if="msg.draft">
+                <div class="mt-3 p-3 rounded-lg" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
+                  <p class="text-xs font-semibold mb-2" style="color: #166534;">Plan Draft</p>
+                  <p class="text-xs mb-1" x-text="(msg.draft.assignments?.length || 0) + ' bed assignments'"></p>
+                  <p class="text-xs mb-1" x-text="(msg.draft.successions?.length || 0) + ' succession schedules'"></p>
+                  <p class="text-xs mb-2" x-text="(msg.draft.tasks?.length || 0) + ' tasks'"></p>
+                  <button @click="commitDraft(msg.draft)" :disabled="msg.committed"
+                    class="text-xs px-3 py-1.5 rounded-lg font-medium"
+                    :style="msg.committed ? 'background: #d1fae5; color: #166534;' : 'background: var(--green-900); color: white;'"
+                    x-text="msg.committed ? 'Plan created ✓' : 'Create this plan'">
+                  </button>
+                </div>
+              </template>
+            </div>
           </div>
         </div>
       </template>
