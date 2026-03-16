@@ -5,10 +5,22 @@ class SeedCatalogEntry < Sequel::Model
   def self.search(query)
     return [] if query.nil? || query.strip.empty?
     normalized = normalize(query)
-    where(Sequel.like(:variety_name_normalized, "%#{normalized}%"))
-      .order(:variety_name)
-      .limit(10)
+
+    # Find all substring matches
+    results = where(Sequel.like(:variety_name_normalized, "%#{normalized}%"))
+      .limit(20)
       .all
+
+    # Sort: exact matches first, then starts-with, then contains
+    results.sort_by do |r|
+      if r.variety_name_normalized == normalized
+        [0, r.variety_name]
+      elsif r.variety_name_normalized.start_with?(normalized)
+        [1, r.variety_name]
+      else
+        [2, r.variety_name]
+      end
+    end.first(10)
   end
 
   # Normalize a string for matching: lowercase, strip accents, collapse whitespace
