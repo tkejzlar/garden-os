@@ -1,0 +1,24 @@
+require "ruby_llm"
+require_relative "../../models/plant"
+
+class GetPlantsTool < RubyLLM::Tool
+  description "Get all active plants currently being grown — variety, stage, location, days in stage"
+
+  def execute
+    plants = Plant.exclude(lifecycle_stage: "done").all.map do |p|
+      slot = p.slot
+      row = slot&.row
+      bed = row&.bed
+      {
+        variety_name: p.variety_name,
+        crop_type: p.crop_type,
+        stage: p.lifecycle_stage,
+        days_in_stage: p.days_in_stage,
+        bed: bed&.name,
+        row: row&.name,
+        sow_date: p.sow_date&.to_s
+      }
+    end
+    JSON.generate({ plants: plants, total: plants.length })
+  end
+end
