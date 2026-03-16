@@ -1,0 +1,51 @@
+<h1 class="text-2xl font-bold mb-6">Succession Planner</h1>
+
+<% if @plans.empty? %>
+  <p class="text-stone-500">No succession plans yet.</p>
+<% else %>
+  <div class="space-y-4">
+    <% @plans.each do |plan| %>
+      <% completed = Task.where(task_type: "sow")
+                         .where(Sequel.like(:title, "%#{plan.crop}%"))
+                         .where(status: "done").count
+         total = plan.total_planned_sowings || 0
+         pct = total > 0 ? (completed.to_f / total * 100).round : 0
+         next_date = plan.next_sowing_date(completed) %>
+      <div class="bg-white rounded-lg p-4 shadow-sm">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold"><%= plan.crop %></h2>
+          <span class="text-sm text-stone-500"><%= completed %>/<%= total %> sowings</span>
+        </div>
+
+        <div class="w-full bg-stone-200 rounded-full h-3 mb-3">
+          <div class="bg-green-500 h-3 rounded-full" style="width: <%= pct %>%"></div>
+        </div>
+
+        <div class="flex gap-2 mb-3">
+          <% total.times do |i| %>
+            <% if i < completed %>
+              <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-xs"><%= i + 1 %></div>
+            <% elsif i == completed %>
+              <div class="w-6 h-6 rounded-full bg-amber-400 border-2 border-amber-500 flex items-center justify-center text-xs font-bold"><%= i + 1 %></div>
+            <% else %>
+              <div class="w-6 h-6 rounded-full bg-stone-200 flex items-center justify-center text-stone-400 text-xs"><%= i + 1 %></div>
+            <% end %>
+          <% end %>
+        </div>
+
+        <div class="text-sm text-stone-600">
+          <p>Every <strong><%= plan.interval_days %></strong> days — Varieties: <%= plan.varieties_list.join(", ") %></p>
+          <p>Beds: <%= plan.target_beds_list.join(", ") %></p>
+          <% if next_date && next_date >= Date.today %>
+            <% days_until = (next_date - Date.today).to_i %>
+            <p class="mt-1 font-medium text-amber-700">
+              Next sowing (#<%= completed + 1 %>) in <strong><%= days_until %></strong> days (<%= next_date.strftime("%b %-d") %>)
+            </p>
+          <% elsif completed >= total %>
+            <p class="mt-1 text-green-600 font-medium">All sowings complete!</p>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
