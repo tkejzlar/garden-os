@@ -1,0 +1,143 @@
+<% new_record = @packet.new? %>
+
+<!-- Back Link -->
+<a href="/seeds" class="text-sm hover:underline mb-5 inline-block" style="color: var(--green-900);">
+  &larr; All seeds
+</a>
+
+<!-- Page Header -->
+<% unless new_record %>
+  <div class="mb-5">
+    <h1 class="text-2xl font-bold" style="color: var(--text-primary); letter-spacing: -0.5px;">
+      <%= @packet.variety_name %>
+    </h1>
+    <p class="text-sm capitalize mt-1" style="color: var(--text-secondary);">
+      <%= @packet.crop_type %>
+      <% if @packet.source %>&mdash; <%= @packet.source %><% end %>
+    </p>
+  </div>
+
+  <!-- Status badges -->
+  <div class="flex gap-2 mb-5">
+    <% if @packet.out_of_stock? %>
+      <span class="text-sm px-3 py-1 rounded-full font-medium"
+            style="background: #f3f4f6; color: var(--gray-500);">
+        Out of stock
+      </span>
+    <% end %>
+    <% if @packet.expired? %>
+      <span class="text-sm px-3 py-1 rounded-full font-medium"
+            style="background: #fef2f2; color: #991b1b;">
+        Expired
+      </span>
+    <% elsif @packet.expiring_soon? %>
+      <span class="text-sm px-3 py-1 rounded-full font-medium"
+            style="background: var(--alert-amber-bg); color: #92400e;">
+        Expiring soon — sow by <%= @packet.sow_by_date.strftime("%B %-d, %Y") %>
+      </span>
+    <% end %>
+  </div>
+<% else %>
+  <h1 class="text-2xl font-bold mb-5" style="color: var(--text-primary);">Add Seed Packet</h1>
+<% end %>
+
+<!-- Edit / Add Form -->
+<div class="px-4 py-4 mb-4" style="background: white; border-radius: var(--card-radius); box-shadow: var(--card-shadow);">
+  <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; color: var(--gray-500);" class="mb-4">
+    <%= new_record ? "Packet Details" : "Edit" %>
+  </p>
+
+  <form method="post" action="<%= new_record ? '/seeds' : "/seeds/#{@packet.id}" %>"
+        class="flex flex-col gap-4">
+    <% unless new_record %>
+      <input type="hidden" name="_method" value="PATCH">
+    <% end %>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Variety name *</label>
+      <input type="text" name="variety_name" required
+             value="<%= @packet.variety_name %>"
+             class="w-full rounded-lg px-3 py-2.5 text-sm border"
+             style="border-color: #e5e7eb; color: var(--text-primary);">
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Crop type *</label>
+      <input type="text" name="crop_type" required
+             value="<%= @packet.crop_type %>"
+             placeholder="e.g. tomato, herb, pepper"
+             class="w-full rounded-lg px-3 py-2.5 text-sm border"
+             style="border-color: #e5e7eb; color: var(--text-primary);">
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Source</label>
+      <input type="text" name="source"
+             value="<%= @packet.source %>"
+             placeholder="e.g. Loukykvět, saved"
+             class="w-full rounded-lg px-3 py-2.5 text-sm border"
+             style="border-color: #e5e7eb; color: var(--text-primary);">
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Quantity remaining</label>
+      <input type="number" name="quantity_remaining" min="-999" max="9999"
+             value="<%= @packet.quantity_remaining %>"
+             placeholder="Approximate count or packets"
+             class="w-full rounded-lg px-3 py-2.5 text-sm border"
+             style="border-color: #e5e7eb; color: var(--text-primary);">
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Sow by date</label>
+        <input type="date" name="sow_by_date"
+               value="<%= @packet.sow_by_date %>"
+               class="w-full rounded-lg px-3 py-2.5 text-sm border"
+               style="border-color: #e5e7eb; color: var(--text-primary);">
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Purchase date</label>
+        <input type="date" name="purchase_date"
+               value="<%= @packet.purchase_date %>"
+               class="w-full rounded-lg px-3 py-2.5 text-sm border"
+               style="border-color: #e5e7eb; color: var(--text-primary);">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Supplier URL</label>
+      <input type="url" name="url"
+             value="<%= @packet.url %>"
+             placeholder="https://"
+             class="w-full rounded-lg px-3 py-2.5 text-sm border"
+             style="border-color: #e5e7eb; color: var(--text-primary);">
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Notes</label>
+      <textarea name="notes" rows="3"
+                class="w-full rounded-lg px-3 py-2.5 text-sm border resize-none"
+                style="border-color: #e5e7eb; color: var(--text-primary);"><%= @packet.notes %></textarea>
+    </div>
+
+    <button type="submit"
+            class="w-full py-3 rounded-xl font-semibold text-sm text-white transition hover:opacity-90"
+            style="background: var(--green-900);">
+      <%= new_record ? "Add Packet" : "Save Changes" %>
+    </button>
+  </form>
+</div>
+
+<!-- Delete (existing records only) -->
+<% unless new_record %>
+  <form method="post" action="/seeds/<%= @packet.id %>"
+        onsubmit="return confirm('Delete this seed packet?')">
+    <input type="hidden" name="_method" value="DELETE">
+    <button type="submit"
+            class="w-full py-3 rounded-xl font-semibold text-sm transition hover:opacity-80"
+            style="background: #fef2f2; color: #991b1b;">
+      Delete packet
+    </button>
+  </form>
+<% end %>

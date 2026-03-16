@@ -1,0 +1,68 @@
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold" style="color: var(--text-primary)">Seeds</h1>
+  <a href="/seeds/new"
+     class="text-sm px-3 py-1.5 rounded-lg font-medium"
+     style="background: var(--green-900); color: white;">
+    + Add
+  </a>
+</div>
+
+<% if @packets.empty? %>
+  <div class="text-center py-12" style="color: var(--text-secondary)">
+    <p class="text-base">No seed packets tracked yet. Add your first packet.</p>
+  </div>
+<% else %>
+  <% @packets.group_by(&:crop_type).sort_by { |crop, _| crop }.reverse.each do |crop, packets| %>
+    <p class="mb-2 mt-5 first:mt-0"
+       style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; color: var(--gray-500);">
+      <%= crop %>
+    </p>
+
+    <div class="space-y-2 mb-2">
+      <% packets.each do |packet| %>
+        <a href="/seeds/<%= packet.id %>"
+           class="flex items-center justify-between gap-3 px-4 py-3 block"
+           style="background: white; border-radius: var(--card-radius); box-shadow: var(--card-shadow); text-decoration: none;">
+
+          <div class="flex-1 min-w-0">
+            <p class="font-semibold truncate" style="color: var(--text-primary);">
+              <%= packet.variety_name %>
+            </p>
+            <p class="text-sm mt-0.5" style="color: var(--text-secondary);">
+              <% if packet.source %>
+                <%= packet.source %>
+                <% if !packet.quantity_remaining.nil? %>&nbsp;&middot;<% end %>
+              <% end %>
+              <% unless packet.quantity_remaining.nil? %>
+                <%= packet.quantity_remaining %> remaining
+              <% end %>
+            </p>
+          </div>
+
+          <!-- Status Pills -->
+          <div class="flex gap-2 flex-shrink-0">
+            <% if packet.out_of_stock? %>
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                    style="background: #f3f4f6; color: var(--gray-500);">
+                Out of stock
+              </span>
+            <% end %>
+            <% if packet.expired? %>
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                    style="background: #fef2f2; color: #991b1b;">
+                Expired
+              </span>
+            <% elsif packet.expiring_soon? %>
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                    style="background: var(--alert-amber-bg); color: #92400e;">
+                Sow by <%= packet.sow_by_date.strftime("%b %Y") %>
+              </span>
+            <% end %>
+          </div>
+
+        </a>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>
