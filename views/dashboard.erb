@@ -27,6 +27,65 @@
   </div>
 <% end %>
 
+<!-- Sensor Strip (only when HA sensor env vars are configured) -->
+<% if @sensors_present %>
+  <div class="flex gap-2 overflow-x-auto pb-1 mb-4" style="scrollbar-width: none;">
+
+    <% if @sensor_rain %>
+      <div class="flex items-center gap-1.5 flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-medium"
+           style="background: #dbeafe; color: #1e40af;">
+        <span style="width:8px;height:8px;border-radius:50%;background:#3b82f6;display:inline-block;flex-shrink:0;"></span>
+        Rain detected
+      </div>
+    <% end %>
+
+    <% Array(@sensor_zones).each do |zone| %>
+      <%
+        dot_color = case zone[:state]
+                    when "running" then "#2563eb"   # blue
+                    when "idle"    then "#16a34a"   # green
+                    else                "#9ca3af"   # gray / offline
+                    end
+        bg_color  = case zone[:state]
+                    when "running" then "#dbeafe"
+                    when "idle"    then "#dcfce7"
+                    else                "#f3f4f6"
+                    end
+        text_color = case zone[:state]
+                     when "running" then "#1e40af"
+                     when "idle"    then "#15803d"
+                     else                "#6b7280"
+                     end
+      %>
+      <div class="flex items-center gap-1.5 flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-medium"
+           style="background: <%= bg_color %>; color: <%= text_color %>;">
+        <span style="width:8px;height:8px;border-radius:50%;background:<%= dot_color %>;display:inline-block;flex-shrink:0;"></span>
+        <%= zone[:name] %>
+        <% if zone[:state] == "running" %>
+          <span style="opacity:0.7;">running</span>
+        <% end %>
+      </div>
+    <% end %>
+
+    <% if @sensor_temp %>
+      <%
+        temp_bg    = @sensor_temp[:warning] ? "#fef3c7" : "#f0fdf4"
+        temp_color = @sensor_temp[:warning] ? "#92400e" : "#15803d"
+        temp_icon  = @sensor_temp[:warning] ? "⚠️" : "🌡️"
+      %>
+      <div class="flex items-center gap-1.5 flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-medium"
+           style="background: <%= temp_bg %>; color: <%= temp_color %>;">
+        <span><%= temp_icon %></span>
+        Indoor <%= @sensor_temp[:temp] %>&deg;C
+        <% if @sensor_temp[:warning] %>
+          <span style="opacity:0.7;">— check heat mat</span>
+        <% end %>
+      </div>
+    <% end %>
+
+  </div>
+<% end %>
+
 <!-- Summary Strip -->
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
   <!-- Temp -->

@@ -2,11 +2,13 @@ require_relative "../models/task"
 require_relative "../models/plant"
 require_relative "../models/succession_plan"
 require_relative "../db/seeds/seed_varieties"
+require_relative "sensor_service"
 
 class TaskGenerator
   def self.generate_all!
     generate_succession_tasks!
     generate_germination_checks!
+    auto_skip_watering_tasks!
   end
 
   def self.generate_succession_tasks!
@@ -63,6 +65,36 @@ class TaskGenerator
           notes: "Expected #{variety_info['germination_days_min']}-#{max_days} days. Currently day #{days}."
         )
       end
+    end
+  end
+
+  def self.auto_skip_watering_tasks!
+    return unless sensor_skip_conditions_met?
+
+    reason = build_skip_reason
+    Task.where(task_type: "water")
+        .exclude(status: %w[done skipped])
+        .each do |task|
+          task.update(status: "skipped", notes: [task.notes, reason].compact.join(" | "))
+        end
+  end
+
+  # ---- private helpers -------------------------------------------------------
+
+  def self.sensor_skip_conditions_met?
+    SensorService.rain_detected? || SensorService.irrigation_active?
+  rescue => e
+    warn "TaskGenerator sensor check error: #{e.message}"
+    false
+  end
+
+  def self.build_skip_reason
+    if SensorService.rain_detected?
+      "Auto-skipped: rain detected"
+    elsif SensorService.irrigation_active?
+      "Auto-skipped: irrigation active"
+    else
+      "Auto-skipped: sensor condition"
     end
   end
 end

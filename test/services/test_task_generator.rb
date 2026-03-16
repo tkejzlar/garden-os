@@ -1,6 +1,21 @@
 require_relative "../test_helper"
 require_relative "../../services/task_generator"
 
+# Minimal stub helper for class methods (minitest 6 has no minitest/mock)
+module ClassStub
+  def stub(method_name, val_or_callable, &block)
+    original = method(method_name)
+    define_singleton_method(method_name) do |*a|
+      val_or_callable.respond_to?(:call) ? val_or_callable.call(*a) : val_or_callable
+    end
+    block.call
+  ensure
+    define_singleton_method(method_name, original)
+  end
+end
+
+SensorService.extend(ClassStub) unless SensorService.singleton_class.ancestors.include?(ClassStub)
+
 class TestTaskGenerator < GardenTest
   def test_generates_succession_sowing_task
     sp = SuccessionPlan.create(
@@ -39,5 +54,86 @@ class TestTaskGenerator < GardenTest
 
     TaskGenerator.generate_succession_tasks!
     assert_equal 1, Task.where(task_type: "sow").where(Sequel.like(:title, "%Lettuce%")).count
+  end
+
+  # ---------------------------------------------------------------------------
+  # auto_skip_watering_tasks!
+  # ---------------------------------------------------------------------------
+
+  def test_auto_skip_watering_tasks_skips_when_rain_detected
+    require_relative "../../services/sensor_service"
+    task = Task.create(title: "Water tomatoes", task_type: "water",
+                       due_date: Date.today, status: "upcoming", priority: "should")
+
+    SensorService.stub(:rain_detected?, true) do
+      SensorService.stub(:irrigation_active?, false) do
+        TaskGenerator.auto_skip_watering_tasks!
+      end
+    end
+
+    task.reload
+    assert_equal "skipped", task.status
+    assert_includes task.notes.to_s, "Auto-skipped: rain detected"
+  end
+
+  def test_auto_skip_watering_tasks_skips_when_irrigation_active
+    require_relative "../../services/sensor_service"
+    task = Task.create(title: "Water herbs", task_type: "water",
+                       due_date: Date.today, status: "upcoming", priority: "should")
+
+    SensorService.stub(:rain_detected?, false) do
+      SensorService.stub(:irrigation_active?, true) do
+        TaskGenerator.auto_skip_watering_tasks!
+      end
+    end
+
+    task.reload
+    assert_equal "skipped", task.status
+    assert_includes task.notes.to_s, "Auto-skipped: irrigation active"
+  end
+
+  def test_auto_skip_watering_tasks_does_not_skip_when_no_conditions
+    require_relative "../../services/sensor_service"
+    task = Task.create(title: "Water seedlings", task_type: "water",
+                       due_date: Date.today, status: "upcoming", priority: "should")
+
+    SensorService.stub(:rain_detected?, false) do
+      SensorService.stub(:irrigation_active?, false) do
+        TaskGenerator.auto_skip_watering_tasks!
+      end
+    end
+
+    task.reload
+    assert_equal "upcoming", task.status
+  end
+
+  def test_auto_skip_watering_tasks_does_not_touch_done_tasks
+    require_relative "../../services/sensor_service"
+    task = Task.create(title: "Water beds", task_type: "water",
+                       due_date: Date.today, status: "done", priority: "should")
+
+    SensorService.stub(:rain_detected?, true) do
+      SensorService.stub(:irrigation_active?, false) do
+        TaskGenerator.auto_skip_watering_tasks!
+      end
+    end
+
+    task.reload
+    assert_equal "done", task.status
+  end
+
+  def test_auto_skip_does_not_affect_non_water_tasks
+    require_relative "../../services/sensor_service"
+    task = Task.create(title: "Sow Lettuce #1", task_type: "sow",
+                       due_date: Date.today, status: "upcoming", priority: "should")
+
+    SensorService.stub(:rain_detected?, true) do
+      SensorService.stub(:irrigation_active?, false) do
+        TaskGenerator.auto_skip_watering_tasks!
+      end
+    end
+
+    task.reload
+    assert_equal "upcoming", task.status
   end
 end
