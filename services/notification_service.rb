@@ -1,5 +1,4 @@
 require "json"
-require "httpx"
 require_relative "../models/task"
 require_relative "../models/plant"
 require_relative "weather_service"
@@ -12,23 +11,17 @@ class NotificationService
   def self.send!(title:, message:, data: {})
     return false if ha_token.empty?
 
-    payload = {
-      title: title,
-      message: message,
-      data: data
-    }
+    payload = JSON.generate(title: title, message: message, data: data)
+    service_path = notify_service.sub(".", "/")
 
-    response = HTTPX.with(
-      headers: {
-        "Authorization" => "Bearer #{ha_token}",
-        "Content-Type" => "application/json"
-      }
-    ).post(
-      "#{ha_url}/api/services/#{notify_service.sub('.', '/')}",
-      json: payload
-    )
+    output = `curl -s --connect-timeout 5 --max-time 10 \
+      -X POST \
+      -H "Authorization: Bearer #{ha_token}" \
+      -H "Content-Type: application/json" \
+      -d '#{payload}' \
+      "#{ha_url}/api/services/#{service_path}" 2>&1`
 
-    response.status == 200
+    $?.exitstatus == 0
   rescue => e
     warn "NotificationService error: #{e.message}"
     false

@@ -9,7 +9,6 @@ gem "sequel", "~> 5.0"
 gem "sqlite3", "~> 2.0"
 gem "rufus-scheduler", "~> 3.9"
 gem "ruby_llm"
-gem "httpx", "~> 1.0"
 gem "rake", "~> 13.0"
 
 group :test do
