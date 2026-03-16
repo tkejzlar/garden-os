@@ -53,7 +53,16 @@
         </div>
       </template>
       <!-- Thinking indicator -->
-      <!-- Removed: streaming content now renders directly in the AI message bubble -->
+      <template x-if="sending">
+        <div class="flex justify-start">
+          <div class="rounded-xl px-4 py-3 text-sm flex items-center gap-2" style="background: white; box-shadow: var(--card-shadow); color: var(--gray-500);">
+            <svg width="14" height="14" viewBox="0 0 16 16" style="animation: blink 1s ease infinite;">
+              <circle cx="8" cy="8" r="5" fill="currentColor"/>
+            </svg>
+            Thinking...
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- Input -->
@@ -90,28 +99,37 @@ function plannerChat() {
 
       // Kick off the AI in background — returns immediately with a request ID
       try {
+        console.log('[Planner] Sending ask...');
         const resp = await fetch('/succession/planner/ask', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: text })
         });
-        const { request_id } = await resp.json();
+        const askData = await resp.json();
+        console.log('[Planner] Got request_id:', askData.request_id);
+
+        if (!askData.request_id) {
+          throw new Error('No request_id returned: ' + JSON.stringify(askData));
+        }
 
         // Poll for the response
-        await this.pollForResponse(request_id);
+        await this.pollForResponse(askData.request_id);
       } catch(e) {
+        console.error('[Planner] Error:', e);
         this.messages.push({ role: 'assistant', content: 'Sorry, something went wrong: ' + e.message, created_at: Date.now() });
         this.sending = false;
       }
     },
 
     async pollForResponse(requestId) {
+      console.log('[Planner] Polling for', requestId);
       const maxAttempts = 60; // 60 * 2s = 2 minutes max
       for (let i = 0; i < maxAttempts; i++) {
         await new Promise(r => setTimeout(r, 2000));
         try {
           const resp = await fetch('/succession/planner/result/' + requestId);
           const data = await resp.json();
+          console.log('[Planner] Poll', i, ':', data.status, data.content?.length || 0, 'chars');
 
           if (data.status === 'done') {
             this.messages.push({
@@ -126,6 +144,7 @@ function plannerChat() {
           }
           // status === 'pending' — keep polling
         } catch(e) {
+          console.warn('[Planner] Poll error:', e.message);
           // Network error — keep trying
         }
       }
