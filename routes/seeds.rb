@@ -6,6 +6,21 @@ class GardenApp
     erb :"seeds/index"
   end
 
+  # AI variety lookup
+  get "/api/seeds/lookup" do
+    variety = params[:q].to_s.strip
+    halt 400, json(error: "q parameter required") if variety.empty?
+
+    require_relative "../services/variety_lookup_service"
+    result = VarietyLookupService.lookup(variety)
+
+    if result
+      json result
+    else
+      halt 503, json(error: "Lookup failed — check AI provider config")
+    end
+  end
+
   get "/seeds/new" do
     @packet = SeedPacket.new
     erb :"seeds/show"
