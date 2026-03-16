@@ -22,5 +22,10 @@
   <main class="max-w-4xl mx-auto px-4 py-6">
     <%= yield %>
   </main>
+<script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+</script>
 </body>
 </html>
