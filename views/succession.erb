@@ -1,50 +1,94 @@
-<h1 class="text-2xl font-bold mb-6">Succession Planner</h1>
+<!-- Page Header -->
+<div class="mb-6">
+  <h1 class="text-2xl font-bold" style="color: var(--text-primary); letter-spacing: -0.5px;">
+    Succession Planner
+  </h1>
+</div>
 
 <% if @plans.empty? %>
-  <p class="text-stone-500">No succession plans yet.</p>
+  <div class="text-center py-12" style="color: var(--text-secondary);">
+    <p class="text-base">No succession plans set up yet.</p>
+  </div>
 <% else %>
   <div class="space-y-4">
     <% @plans.each do |plan| %>
-      <% completed = Task.where(task_type: "sow")
-                         .where(Sequel.like(:title, "%#{plan.crop}%"))
-                         .where(status: "done").count
-         total = plan.total_planned_sowings || 0
-         pct = total > 0 ? (completed.to_f / total * 100).round : 0
-         next_date = plan.next_sowing_date(completed) %>
-      <div class="bg-white rounded-lg p-4 shadow-sm">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-lg font-semibold"><%= plan.crop %></h2>
-          <span class="text-sm text-stone-500"><%= completed %>/<%= total %> sowings</span>
+      <%
+        completed = Task.where(task_type: "sow")
+                       .where(Sequel.like(:title, "%#{plan.crop}%"))
+                       .where(status: "done").count
+        total = plan.total_planned_sowings || 0
+        pct = total > 0 ? (completed.to_f / total * 100).round : 0
+        next_date = plan.next_sowing_date(completed)
+      %>
+      <div style="background: white; border-radius: var(--card-radius); padding: 16px; box-shadow: var(--card-shadow);">
+
+        <!-- Header row: crop name + count -->
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold" style="color: var(--text-primary);">
+            <%= plan.crop %>
+          </h2>
+          <span class="text-sm font-medium" style="color: var(--text-secondary);">
+            <%= completed %>/<%= total %>
+          </span>
         </div>
 
-        <div class="w-full bg-stone-200 rounded-full h-3 mb-3">
-          <div class="bg-green-500 h-3 rounded-full" style="width: <%= pct %>%"></div>
+        <!-- Progress Bar -->
+        <div class="rounded-full mb-3" style="background: #e5e7eb; height: 6px; overflow: hidden;">
+          <div class="h-full rounded-full transition-all"
+               style="width: <%= pct %>%; background: #16a34a;"></div>
         </div>
 
-        <div class="flex gap-2 mb-3">
+        <!-- Numbered Sowing Dots -->
+        <div class="flex flex-wrap gap-2 mb-4">
           <% total.times do |i| %>
             <% if i < completed %>
-              <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-xs"><%= i + 1 %></div>
+              <!-- Completed: green -->
+              <div class="flex items-center justify-center rounded-full text-xs font-bold text-white"
+                   style="width: 24px; height: 24px; background: #16a34a;">
+                <%= i + 1 %>
+              </div>
             <% elsif i == completed %>
-              <div class="w-6 h-6 rounded-full bg-amber-400 border-2 border-amber-500 flex items-center justify-center text-xs font-bold"><%= i + 1 %></div>
+              <!-- Current/next: amber -->
+              <div class="flex items-center justify-center rounded-full text-xs font-bold"
+                   style="width: 24px; height: 24px; background: var(--alert-amber-bg); border: 2px solid var(--alert-amber-border); color: #92400e;">
+                <%= i + 1 %>
+              </div>
             <% else %>
-              <div class="w-6 h-6 rounded-full bg-stone-200 flex items-center justify-center text-stone-400 text-xs"><%= i + 1 %></div>
+              <!-- Future: gray -->
+              <div class="flex items-center justify-center rounded-full text-xs"
+                   style="width: 24px; height: 24px; background: #f3f4f6; color: var(--gray-400);">
+                <%= i + 1 %>
+              </div>
             <% end %>
           <% end %>
         </div>
 
-        <div class="text-sm text-stone-600">
-          <p>Every <strong><%= plan.interval_days %></strong> days — Varieties: <%= plan.varieties_list.join(", ") %></p>
-          <p>Beds: <%= plan.target_beds_list.join(", ") %></p>
+        <!-- Details -->
+        <div class="text-sm space-y-1" style="color: var(--text-secondary);">
+          <p>
+            Every <strong style="color: var(--text-primary);"><%= plan.interval_days %></strong> days
+            &mdash;
+            <span style="color: var(--text-primary);"><%= plan.varieties_list.join(", ") %></span>
+          </p>
+          <% unless plan.target_beds_list.empty? %>
+            <p>Beds: <%= plan.target_beds_list.join(", ") %></p>
+          <% end %>
+
+          <!-- Next sowing countdown -->
           <% if next_date && next_date >= Date.today %>
             <% days_until = (next_date - Date.today).to_i %>
-            <p class="mt-1 font-medium text-amber-700">
-              Next sowing (#<%= completed + 1 %>) in <strong><%= days_until %></strong> days (<%= next_date.strftime("%b %-d") %>)
+            <p class="font-semibold mt-2" style="color: #92400e;">
+              Next sowing (#<%= completed + 1 %>) in
+              <strong><%= days_until %></strong> days
+              (<%= next_date.strftime("%b %-d") %>)
             </p>
           <% elsif completed >= total %>
-            <p class="mt-1 text-green-600 font-medium">All sowings complete!</p>
+            <p class="font-semibold mt-2" style="color: #16a34a;">
+              All sowings complete!
+            </p>
           <% end %>
         </div>
+
       </div>
     <% end %>
   </div>
