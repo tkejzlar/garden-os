@@ -35,7 +35,7 @@ class VarietyLookupService
   def self.lookup(variety_name)
     return nil if variety_name.nil? || variety_name.strip.empty?
 
-    chat = RubyLLM.chat(model: model_id)
+    chat = RubyLLM.chat(model: model_id, assume_model_exists: true)
       .with_instructions(system_prompt)
       .with_temperature(0.2)
 

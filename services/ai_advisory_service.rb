@@ -82,7 +82,7 @@ class AIAdvisoryService
   def self.run_daily!
     context = build_context
 
-    chat = RubyLLM.chat(model: model_id)
+    chat = RubyLLM.chat(model: model_id, assume_model_exists: true)
       .with_instructions(system_prompt)
       .with_temperature(0.3)
 
