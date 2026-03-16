@@ -79,6 +79,39 @@ class TaskGenerator
         end
   end
 
+  # Generate tasks for a single succession plan (called from UI "Generate" button)
+  def self.generate_for_plan!(sp)
+    return if sp.season_end && sp.season_end < Date.today
+
+    existing = Task.where(task_type: "sow")
+                   .where(Sequel.like(:title, "%#{sp.crop}%")).count
+
+    total = sp.total_planned_sowings.to_i
+    return if existing >= total
+
+    # Generate ALL remaining tasks for this plan (not just the next 14 days)
+    beds_str = sp.target_beds_list.join(", ")
+    (existing...total).each do |i|
+      next_date = sp.next_sowing_date(i)
+      next if next_date.nil?
+
+      already_exists = Task.where(task_type: "sow")
+                           .where(Sequel.like(:title, "%#{sp.crop}%"))
+                           .where(due_date: (next_date - 3)..(next_date + 3))
+                           .any?
+      next if already_exists
+
+      Task.create(
+        title: "Sow #{sp.crop} ##{i + 1} — #{beds_str}",
+        task_type: "sow",
+        due_date: next_date,
+        priority: "should",
+        status: "upcoming",
+        notes: "Varieties: #{sp.varieties_list.join(', ')}. Succession #{i + 1} of #{total}."
+      )
+    end
+  end
+
   # ---- private helpers -------------------------------------------------------
 
   def self.sensor_skip_conditions_met?
