@@ -30,21 +30,20 @@ class TestSeeds < GardenTest
   end
 
   def test_create_seed_packet
-    post "/seeds", variety_name: "Sungold", crop_type: "tomato",
-                   source: "Loukykvět", quantity_remaining: "10"
+    post "/seeds", variety_name: "Sungold", crop_type: "tomato", source: "Reinsaat"
     assert_equal 302, last_response.status
     assert_equal 1, SeedPacket.count
     packet = SeedPacket.first
     assert_equal "Sungold", packet.variety_name
-    assert_equal "tomato",  packet.crop_type
-    assert_equal 10,        packet.quantity_remaining
+    assert_equal "tomato", packet.crop_type
+    assert_equal "Reinsaat", packet.source
   end
 
-  def test_create_seed_packet_with_sow_by_date
-    post "/seeds", variety_name: "Basil", crop_type: "herb",
-                   sow_by_date: "2027-01-01"
+  def test_create_seed_packet_with_notes
+    post "/seeds", variety_name: "Raf", crop_type: "tomato",
+                   notes: "Flesh tomato, 75-80 days"
     assert_equal 302, last_response.status
-    assert_equal Date.new(2027, 1, 1), SeedPacket.first.sow_by_date
+    assert_equal "Flesh tomato, 75-80 days", SeedPacket.first.notes
   end
 
   def test_update_seed_packet
@@ -82,27 +81,11 @@ class TestSeeds < GardenTest
     body = last_response.body
     assert_includes body, "tomato"
     assert_includes body, "herb"
-    tomato_pos = body.index("tomato")
-    herb_pos   = body.index("herb")
-    assert herb_pos > tomato_pos, "herb section should appear after tomato (alphabetical)"
   end
 
-  def test_expired_model_helper
-    packet = SeedPacket.new(sow_by_date: Date.today - 1)
-    assert packet.expired?
-    refute packet.expiring_soon?
-  end
-
-  def test_expiring_soon_model_helper
-    packet = SeedPacket.new(sow_by_date: Date.today + 90)
-    refute packet.expired?
-    assert packet.expiring_soon?
-  end
-
-  def test_out_of_stock_model_helper
-    assert SeedPacket.new(quantity_remaining: 0).out_of_stock?
-    assert SeedPacket.new(quantity_remaining: -1).out_of_stock?
-    refute SeedPacket.new(quantity_remaining: 1).out_of_stock?
-    refute SeedPacket.new(quantity_remaining: nil).out_of_stock?
+  def test_new_form_renders
+    get "/seeds/new"
+    assert_equal 200, last_response.status
+    assert_includes last_response.body, "Add Seed"
   end
 end

@@ -16,201 +16,155 @@
       <% if @packet.source %>&mdash; <%= @packet.source %><% end %>
     </p>
   </div>
-
-  <!-- Status badges -->
-  <div class="flex gap-2 mb-5">
-    <% if @packet.out_of_stock? %>
-      <span class="text-sm px-3 py-1 rounded-full font-medium"
-            style="background: #f3f4f6; color: var(--gray-500);">
-        Out of stock
-      </span>
-    <% end %>
-    <% if @packet.expired? %>
-      <span class="text-sm px-3 py-1 rounded-full font-medium"
-            style="background: #fef2f2; color: #991b1b;">
-        Expired
-      </span>
-    <% elsif @packet.expiring_soon? %>
-      <span class="text-sm px-3 py-1 rounded-full font-medium"
-            style="background: var(--alert-amber-bg); color: #92400e;">
-        Expiring soon — sow by <%= @packet.sow_by_date.strftime("%B %-d, %Y") %>
-      </span>
-    <% end %>
-  </div>
 <% else %>
   <h1 class="text-2xl font-bold mb-5" style="color: var(--text-primary);">Add Seed Packet</h1>
 <% end %>
 
-<!-- Edit / Add Form -->
+<!-- Form -->
 <div class="px-4 py-4 mb-4" style="background: white; border-radius: var(--card-radius); box-shadow: var(--card-shadow);">
-  <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; color: var(--gray-500);" class="mb-4">
-    <%= new_record ? "Packet Details" : "Edit" %>
-  </p>
-
   <form method="post" action="<%= new_record ? '/seeds' : "/seeds/#{@packet.id}" %>"
         class="flex flex-col gap-4"
         x-data="{
+          query: '<%= @packet.variety_name %>',
+          source: '<%= @packet.source %>',
+          suggestions: [],
+          showSuggestions: false,
+          debounceTimer: null,
           loading: false,
-          looked_up: false,
-          lookup_source: '',
-          lookup_notes: '',
-          lookup_matches: [],
-          async lookup() {
-            const name = this.$refs.variety_name.value.trim();
-            if (!name) return;
-            this.loading = true;
-            this.looked_up = false;
-            this.lookup_matches = [];
+          catalogMatch: null,
+
+          onInput() {
+            clearTimeout(this.debounceTimer);
+            const q = this.query.trim();
+            if (q.length < 2) { this.suggestions = []; this.showSuggestions = false; return; }
+            this.debounceTimer = setTimeout(() => this.fetchSuggestions(q), 200);
+          },
+
+          async fetchSuggestions(q) {
             try {
-              const source = this.$refs.source ? this.$refs.source.value.trim() : '';
-              let url = '/api/seeds/lookup?q=' + encodeURIComponent(name);
-              if (source) url += '&source=' + encodeURIComponent(source);
+              let url = '/api/seeds/lookup?q=' + encodeURIComponent(q);
+              const src = this.source.trim();
+              if (src) url += '&source=' + encodeURIComponent(src);
               const resp = await fetch(url);
-              if (!resp.ok) throw new Error('Lookup failed');
+              if (!resp.ok) return;
+              const data = await resp.json();
+              if (data.source === 'catalog' && data.matches) {
+                this.suggestions = data.matches;
+                this.showSuggestions = this.suggestions.length > 0;
+              } else {
+                this.suggestions = [];
+                this.showSuggestions = false;
+              }
+            } catch(e) { /* silent */ }
+          },
+
+          selectSuggestion(match) {
+            this.query = match.name;
+            this.$refs.crop_type.value = match.crop_type;
+            this.showSuggestions = false;
+            this.catalogMatch = match;
+            // Fetch full details for the notes
+            this.fetchDetails(match.name);
+          },
+
+          async fetchDetails(name) {
+            this.loading = true;
+            try {
+              let url = '/api/seeds/lookup?q=' + encodeURIComponent(name);
+              const src = this.source.trim();
+              if (src) url += '&source=' + encodeURIComponent(src);
+              const resp = await fetch(url);
+              if (!resp.ok) return;
               const data = await resp.json();
               if (data.crop_type) this.$refs.crop_type.value = data.crop_type;
-              if (data.notes) {
-                this.$refs.notes.value = data.notes;
-                this.lookup_notes = data.notes;
+              if (data.notes) this.$refs.notes.value = data.notes;
+              if (data.source === 'catalog') {
+                this.catalogMatch = { name, supplier: data.supplier, crop_type: data.crop_type };
               }
-              if (data.supplier_url) this.$refs.url.value = data.supplier_url;
-              this.lookup_source = data.source || 'ai';
-              this.lookup_matches = (data.matches && data.matches.length > 1) ? data.matches : [];
-              this.looked_up = true;
-            } catch(e) {
-              console.error(e);
-              this.lookup_source = 'error';
-              this.lookup_notes = 'Lookup failed — try again or fill in manually.';
-              this.looked_up = true;
-            } finally {
-              this.loading = false;
-            }
+            } catch(e) { /* silent */ }
+            finally { this.loading = false; }
           },
-          applyMatch(match) {
-            this.$refs.crop_type.value = match.crop_type;
-            this.lookup_source = 'catalog';
-            this.lookup_matches = [];
+
+          dismissSuggestions() {
+            setTimeout(() => { this.showSuggestions = false; }, 200);
           }
         }">
     <% unless new_record %>
       <input type="hidden" name="_method" value="PATCH">
     <% end %>
 
-    <div>
+    <!-- Variety Name with typeahead -->
+    <div class="relative">
       <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Variety name *</label>
-      <div class="flex gap-2">
-        <input type="text" name="variety_name" x-ref="variety_name" required
-               value="<%= @packet.variety_name %>" class="flex-1 rounded-lg px-3 py-2.5 text-sm border"
-               style="border-color: #e5e7eb;">
-        <button type="button" @click="lookup()" :disabled="loading"
-                class="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
-                style="background: var(--green-900); color: white;">
-          <span x-show="!loading">🔍 Look up</span>
-          <span x-show="loading">Looking up...</span>
-        </button>
+      <input type="text" name="variety_name" x-model="query" required
+             @input="onInput()" @focus="onInput()" @blur="dismissSuggestions()"
+             autocomplete="off"
+             class="w-full rounded-lg px-3 py-2.5 text-sm border"
+             style="border-color: #e5e7eb;">
+
+      <!-- Typeahead dropdown -->
+      <div x-show="showSuggestions && suggestions.length > 0" x-transition
+           class="absolute left-0 right-0 mt-1 rounded-lg overflow-hidden z-50"
+           style="background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.12); border: 1px solid #e5e7eb;">
+        <template x-for="s in suggestions.slice(0, 6)" :key="s.name + s.supplier">
+          <button type="button" @mousedown.prevent="selectSuggestion(s)"
+                  class="w-full text-left px-3 py-2.5 text-sm flex items-center justify-between hover:bg-gray-50 border-b last:border-0"
+                  style="border-color: #f3f4f6;">
+            <div>
+              <span x-text="s.name" class="font-medium" style="color: var(--text-primary);"></span>
+              <span class="ml-1.5 capitalize" style="color: var(--text-secondary);" x-text="s.crop_type"></span>
+            </div>
+            <span class="text-xs" style="color: var(--gray-400);" x-text="s.supplier"></span>
+          </button>
+        </template>
       </div>
     </div>
 
+    <!-- Source -->
     <div>
-      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Source <span class="font-normal">(narrows catalog + AI lookup)</span></label>
-      <input type="text" name="source" x-ref="source"
+      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Source</label>
+      <input type="text" name="source" x-model="source"
              value="<%= @packet.source %>"
-             placeholder="e.g. Loukykvět, Magic Garden Seeds"
+             placeholder="e.g. Reinsaat, Bingenheimer, Sativa"
              class="w-full rounded-lg px-3 py-2.5 text-sm border"
              style="border-color: #e5e7eb; color: var(--text-primary);">
     </div>
 
+    <!-- Crop type (auto-filled) -->
     <div>
       <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Crop type *</label>
       <input type="text" name="crop_type" x-ref="crop_type" required
              value="<%= @packet.crop_type %>"
-             placeholder="auto-filled by lookup, or type manually"
+             placeholder="auto-filled from catalog"
              class="w-full rounded-lg px-3 py-2.5 text-sm border"
              style="border-color: #e5e7eb; color: var(--text-primary);">
     </div>
 
+    <!-- Growing notes (auto-filled from catalog) -->
     <div>
-      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Quantity remaining</label>
-      <input type="number" name="quantity_remaining" min="-999" max="9999"
-             value="<%= @packet.quantity_remaining %>"
-             placeholder="Approximate count or packets"
-             class="w-full rounded-lg px-3 py-2.5 text-sm border"
-             style="border-color: #e5e7eb; color: var(--text-primary);">
-    </div>
-
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Sow by date</label>
-        <input type="date" name="sow_by_date"
-               value="<%= @packet.sow_by_date %>"
-               class="w-full rounded-lg px-3 py-2.5 text-sm border"
-               style="border-color: #e5e7eb; color: var(--text-primary);">
-      </div>
-      <div>
-        <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Purchase date</label>
-        <input type="date" name="purchase_date"
-               value="<%= @packet.purchase_date %>"
-               class="w-full rounded-lg px-3 py-2.5 text-sm border"
-               style="border-color: #e5e7eb; color: var(--text-primary);">
-      </div>
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Supplier URL</label>
-      <input type="url" name="url" x-ref="url"
-             value="<%= @packet.url %>"
-             placeholder="https://"
-             class="w-full rounded-lg px-3 py-2.5 text-sm border"
-             style="border-color: #e5e7eb; color: var(--text-primary);">
-    </div>
-
-    <div>
-      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Notes</label>
-      <textarea name="notes" x-ref="notes" rows="3"
+      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Growing notes</label>
+      <textarea name="notes" x-ref="notes" rows="4"
                 class="w-full rounded-lg px-3 py-2.5 text-sm border resize-none"
-                style="border-color: #e5e7eb; color: var(--text-primary);"><%= @packet.notes %></textarea>
+                style="border-color: #e5e7eb; color: var(--text-primary);"
+                placeholder="auto-filled from catalog, or add your own"><%= @packet.notes %></textarea>
     </div>
 
-    <template x-if="looked_up && lookup_source === 'catalog'">
-      <div class="rounded-lg px-3 py-2.5 text-xs" style="background: #f0fdf4; color: #166534; border: 1px solid #86efac;">
-        <strong>Found in catalog</strong> <span x-text="lookup_notes ? ' — ' + lookup_notes : ''"></span>
+    <!-- Catalog match indicator -->
+    <template x-if="catalogMatch">
+      <div class="rounded-lg px-3 py-2 text-xs flex items-center gap-2" style="background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;">
+        <span>Found in <strong x-text="catalogMatch.supplier"></strong> catalog</span>
+        <span style="color: #86efac;">&#10003;</span>
       </div>
     </template>
 
-    <template x-if="looked_up && lookup_source === 'ai'">
-      <div class="rounded-lg px-3 py-2.5 text-xs" style="background: #fffbeb; color: #92400e; border: 1px solid #fcd34d;">
-        <strong>AI suggestion — verify before saving.</strong> <span x-text="lookup_notes ? ' ' + lookup_notes : ''"></span>
-      </div>
-    </template>
-
-    <template x-if="looked_up && lookup_source === 'error'">
-      <div class="rounded-lg px-3 py-2.5 text-xs" style="background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5;">
-        <span x-text="lookup_notes"></span>
-      </div>
-    </template>
-
-    <template x-if="lookup_matches.length > 0">
-      <div class="rounded-lg px-3 py-2.5 text-xs" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-        <p class="font-medium mb-2" style="color: var(--text-secondary);">Multiple matches — click to apply:</p>
-        <div class="flex flex-col gap-1">
-          <template x-for="match in lookup_matches" :key="match.name + match.supplier">
-            <button type="button" @click="applyMatch(match)"
-                    class="text-left px-2 py-1.5 rounded hover:opacity-80"
-                    style="background: white; border: 1px solid #e5e7eb; color: var(--text-primary);">
-              <span x-text="match.name" class="font-medium"></span>
-              <span class="ml-1" style="color: var(--text-secondary);">—</span>
-              <span x-text="match.crop_type" class="ml-1 capitalize" style="color: var(--text-secondary);"></span>
-              <span class="ml-1 text-xs" style="color: var(--gray-500);">(<span x-text="match.supplier"></span>)</span>
-            </button>
-          </template>
-        </div>
-      </div>
+    <template x-if="loading">
+      <div class="text-xs" style="color: var(--gray-500);">Loading details...</div>
     </template>
 
     <button type="submit"
             class="w-full py-3 rounded-xl font-semibold text-sm text-white transition hover:opacity-90"
             style="background: var(--green-900);">
-      <%= new_record ? "Add Packet" : "Save Changes" %>
+      <%= new_record ? "Add Seed" : "Save Changes" %>
     </button>
   </form>
 </div>

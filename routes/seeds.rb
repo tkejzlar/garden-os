@@ -35,16 +35,12 @@ class GardenApp
 
   post "/seeds" do
     SeedPacket.create(
-      variety_name:       params[:variety_name].to_s.strip,
-      crop_type:          params[:crop_type].to_s.strip,
-      source:             params[:source].to_s.strip.then { |v| v.empty? ? nil : v },
-      quantity_remaining: params[:quantity_remaining].to_s.strip.then { |v| v.empty? ? nil : v.to_i },
-      sow_by_date:        params[:sow_by_date].to_s.strip.then { |v| v.empty? ? nil : Date.parse(v) },
-      purchase_date:      params[:purchase_date].to_s.strip.then { |v| v.empty? ? nil : Date.parse(v) },
-      url:                params[:url].to_s.strip.then { |v| v.empty? ? nil : v },
-      notes:              params[:notes].to_s.strip.then { |v| v.empty? ? nil : v },
-      created_at:         Time.now,
-      updated_at:         Time.now
+      variety_name: params[:variety_name].to_s.strip,
+      crop_type:    params[:crop_type].to_s.strip,
+      source:       params[:source].to_s.strip.then { |v| v.empty? ? nil : v },
+      notes:        params[:notes].to_s.strip.then { |v| v.empty? ? nil : v },
+      created_at:   Time.now,
+      updated_at:   Time.now
     )
     redirect "/seeds"
   end
@@ -53,15 +49,11 @@ class GardenApp
     packet = SeedPacket[params[:id].to_i]
     halt 404 unless packet
     packet.update(
-      variety_name:       params[:variety_name].to_s.strip,
-      crop_type:          params[:crop_type].to_s.strip,
-      source:             params[:source].to_s.strip.then { |v| v.empty? ? nil : v },
-      quantity_remaining: params[:quantity_remaining].to_s.strip.then { |v| v.empty? ? nil : v.to_i },
-      sow_by_date:        params[:sow_by_date].to_s.strip.then { |v| v.empty? ? nil : Date.parse(v) },
-      purchase_date:      params[:purchase_date].to_s.strip.then { |v| v.empty? ? nil : Date.parse(v) },
-      url:                params[:url].to_s.strip.then { |v| v.empty? ? nil : v },
-      notes:              params[:notes].to_s.strip.then { |v| v.empty? ? nil : v },
-      updated_at:         Time.now
+      variety_name: params[:variety_name].to_s.strip,
+      crop_type:    params[:crop_type].to_s.strip,
+      source:       params[:source].to_s.strip.then { |v| v.empty? ? nil : v },
+      notes:        params[:notes].to_s.strip.then { |v| v.empty? ? nil : v },
+      updated_at:   Time.now
     )
     redirect "/seeds/#{packet.id}"
   end
