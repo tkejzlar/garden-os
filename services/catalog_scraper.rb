@@ -3,7 +3,7 @@ require "uri"
 require_relative "../models/seed_catalog_entry"
 
 class CatalogScraper
-  SCRAPERS = %w[reinsaat bingenheimer sativa magic_garden loukykvet].freeze
+  SCRAPERS = %w[reinsaat bingenheimer sativa magic_garden loukykvet permaseminka].freeze
 
   def self.scrape_all!
     SCRAPERS.each { |s| scrape_supplier!(s) }

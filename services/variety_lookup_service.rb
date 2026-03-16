@@ -114,11 +114,12 @@ class VarietyLookupService
 
   def self.normalize_supplier(source)
     s = source.to_s.downcase
-    return "reinsaat"     if s.include?("reinsaat")
-    return "bingenheimer" if s.include?("bingen")
-    return "sativa"       if s.include?("sativa")
-    return "magic_garden" if s.include?("magic")
-    return "loukykvet"    if s.include?("louky")
+    return "reinsaat"      if s.include?("reinsaat")
+    return "bingenheimer"  if s.include?("bingen")
+    return "sativa"        if s.include?("sativa")
+    return "magic_garden"  if s.include?("magic")
+    return "loukykvet"     if s.include?("louky")
+    return "permaseminka"  if s.include?("perma")
     nil
   end
 
