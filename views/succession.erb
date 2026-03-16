@@ -68,13 +68,15 @@
     </div>
 
     <!-- Input -->
-    <div class="flex gap-2">
-      <input type="text" x-model="input" @keydown.enter="sendMessage()"
+    <div class="flex gap-2 items-end">
+      <textarea x-model="input" @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
+             @input="$el.style.height = 'auto'; $el.style.height = Math.min($el.scrollHeight, 150) + 'px'"
              placeholder="What would you like to grow?"
-             class="flex-1 rounded-xl px-4 py-2.5 text-sm border"
-             style="border-color: #e5e7eb;" :disabled="sending">
+             rows="1"
+             class="flex-1 rounded-xl px-4 py-2.5 text-sm border resize-none"
+             style="border-color: #e5e7eb; max-height: 150px; overflow-y: auto;" :disabled="sending"></textarea>
       <button @click="sendMessage()" :disabled="sending || !input.trim()"
-              class="px-4 py-2.5 rounded-xl text-sm font-medium"
+              class="px-4 py-2.5 rounded-xl text-sm font-medium shrink-0"
               style="background: var(--green-900); color: white;">
         Send
       </button>
