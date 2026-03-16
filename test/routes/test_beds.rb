@@ -2,11 +2,11 @@ require_relative "../test_helper"
 require_relative "../../app"
 
 class TestBeds < GardenTest
-  def test_beds_index
+  def test_beds_index_redirects_to_garden
     Bed.create(name: "BB1", bed_type: "raised")
     get "/beds"
-    assert_equal 200, last_response.status
-    assert_includes last_response.body, "BB1"
+    assert_equal 301, last_response.status
+    assert_includes last_response.headers["Location"], "/garden"
   end
 
   def test_bed_show_with_plants
