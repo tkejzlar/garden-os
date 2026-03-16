@@ -3,3 +3,5 @@ db/*.db
 .env
 vendor/bundle
 .bundle
+public/uploads/**/*
+!public/uploads/.gitkeep

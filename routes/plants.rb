@@ -2,6 +2,7 @@ require_relative "../models/plant"
 require_relative "../models/bed"
 require_relative "../models/stage_history"
 require_relative "../models/harvest"
+require_relative "../models/photo"
 
 class GardenApp
   get "/plants" do
@@ -15,6 +16,7 @@ class GardenApp
     halt 404, "Plant not found" unless @plant
     @history  = StageHistory.where(plant_id: @plant.id).order(:changed_at).all
     @harvests = Harvest.where(plant_id: @plant.id).order(Sequel.desc(:date)).all
+    @photos   = Photo.where(plant_id: @plant.id).order(Sequel.desc(:taken_at)).all
     erb :"plants/show"
   end
 
@@ -43,6 +45,7 @@ class GardenApp
       @plant   = plant
       @history = StageHistory.where(plant_id: plant.id).order(:changed_at).all
       @harvests = Harvest.where(plant_id: plant.id).order(Sequel.desc(:date)).all
+      @photos   = Photo.where(plant_id: plant.id).order(Sequel.desc(:taken_at)).all
       @harvest_error = harvest.errors.full_messages.join(", ")
       return erb :"plants/show"
     end

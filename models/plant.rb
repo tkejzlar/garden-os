@@ -7,6 +7,7 @@ class Plant < Sequel::Model
   many_to_one :indoor_station
   one_to_many :stage_histories
   one_to_many :harvests
+  one_to_many :photos
   many_to_many :tasks
 
   LIFECYCLE_STAGES = %w[

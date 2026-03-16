@@ -10,6 +10,7 @@ class GardenApp < Sinatra::Base
     set :views, File.join(File.dirname(__FILE__), "views")
     set :public_folder, File.join(File.dirname(__FILE__), "public")
     set :method_override, true
+    enable :static
   end
 
   get "/health" do
@@ -23,6 +24,7 @@ require_relative "routes/beds"
 require_relative "routes/tasks"
 require_relative "routes/succession"
 require_relative "routes/seeds"
+require_relative "routes/photos"
 
 # JSON API endpoint combining all data for HACS
 class GardenApp
