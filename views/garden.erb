@@ -134,137 +134,14 @@
       </defs>
       <rect x="-5000" y="-5000" width="15000" height="15000" fill="url(#grid)"/>
 
-      <!-- Placed beds -->
-      <template x-for="bed in placedBeds" :key="bed.id">
-        <g
-          @mousedown.stop="onBedMouseDown($event, bed)"
-          @touchstart.stop.prevent="onBedTouchStart($event, bed)"
-          style="cursor: move;"
-          :opacity="selectedBed && selectedBed.id === bed.id ? 1 : 0.9"
-        >
-          <!-- Rectangle bed -->
-          <template x-if="!bed.canvas_points || bed.canvas_points.length === 0">
-            <g>
-              <rect
-                :x="bed.canvas_x"
-                :y="bed.canvas_y"
-                :width="bed.canvas_width || 100"
-                :height="bed.canvas_height || 60"
-                :fill="bedFill(bed)"
-                :stroke="selectedBed && selectedBed.id === bed.id ? '#365314' : '#86a878'"
-                :stroke-width="selectedBed && selectedBed.id === bed.id ? 2 : 1"
-                rx="3"
-              />
-              <!-- Plant overlay cells -->
-              <template x-if="showPlants">
-                <template x-for="(row, ri) in bed.rows" :key="row.id">
-                  <template x-for="(sd, si) in row.slots" :key="sd.id">
-                    <template x-if="sd.plant">
-                      <text
-                        :x="bed.canvas_x + 4 + si * 18"
-                        :y="bed.canvas_y + 14 + ri * 16"
-                        font-size="9"
-                        :fill="cropTextColor(sd.plant.crop_type)"
-                        font-family="system-ui, sans-serif"
-                        font-weight="600"
-                      ><tspan x-text="sd.plant.variety_name.slice(0,2)"></tspan></text>
-                    </template>
-                  </template>
-                </template>
-              </template>
-              <!-- Bed label -->
-              <text
-                :x="bed.canvas_x + (bed.canvas_width || 100) / 2"
-                :y="bed.canvas_y + (bed.canvas_height || 60) / 2 + 4"
-                text-anchor="middle"
-                font-size="11"
-                font-family="system-ui, sans-serif"
-                font-weight="600"
-                fill="#1a2e05"
-                style="pointer-events: none; user-select: none;"
-                x-text="bed.name"
-              ></text>
-              <!-- Resize handle (bottom-right corner) -->
-              <template x-if="selectedBed && selectedBed.id === bed.id">
-                <rect
-                  :x="bed.canvas_x + (bed.canvas_width || 100) - 6"
-                  :y="bed.canvas_y + (bed.canvas_height || 60) - 6"
-                  width="10"
-                  height="10"
-                  fill="#365314"
-                  rx="2"
-                  style="cursor: se-resize;"
-                  @mousedown.stop="onResizeHandleMouseDown($event, bed)"
-                  @touchstart.stop.prevent="onResizeHandleTouchStart($event, bed)"
-                />
-              </template>
-            </g>
-          </template>
+      <!-- Placed beds (rendered programmatically to avoid template-in-SVG issues) -->
+      <g x-ref="bedsLayer" x-effect="renderBeds()"></g>
 
-          <!-- Polygon bed -->
-          <template x-if="bed.canvas_points && bed.canvas_points.length > 0">
-            <g>
-              <polygon
-                :points="bed.canvas_points.map(p => p.join(',')).join(' ')"
-                :fill="bedFill(bed)"
-                :stroke="selectedBed && selectedBed.id === bed.id ? '#365314' : '#86a878'"
-                :stroke-width="selectedBed && selectedBed.id === bed.id ? 2 : 1"
-              />
-              <!-- Bed label at centroid -->
-              <text
-                :x="polygonCentroid(bed.canvas_points)[0]"
-                :y="polygonCentroid(bed.canvas_points)[1] + 4"
-                text-anchor="middle"
-                font-size="11"
-                font-family="system-ui, sans-serif"
-                font-weight="600"
-                fill="#1a2e05"
-                style="pointer-events: none; user-select: none;"
-                x-text="bed.name"
-              ></text>
-            </g>
-          </template>
-        </g>
-      </template>
+      <!-- Polygon in progress + draw preview (rendered programmatically) -->
+      <g x-ref="previewLayer" x-effect="renderPreview()"></g>
 
-      <!-- Polygon in progress -->
-      <template x-if="activeTool === 'polygon' && polyPoints.length > 0">
-        <g>
-          <polyline
-            :points="[...polyPoints, polyPreview].filter(Boolean).map(p => p.join(',')).join(' ')"
-            fill="none"
-            stroke="#365314"
-            stroke-width="1.5"
-            stroke-dasharray="5,3"
-          />
-          <template x-for="(pt, i) in polyPoints" :key="i">
-            <circle :cx="pt[0]" :cy="pt[1]" r="4" fill="#365314" opacity="0.7"/>
-          </template>
-        </g>
-      </template>
-
-      <!-- Rectangle being drawn -->
-      <template x-if="activeTool === 'rect' && drawRect">
-        <rect
-          :x="drawRect.x"
-          :y="drawRect.y"
-          :width="drawRect.w"
-          :height="drawRect.h"
-          fill="#d1fae5"
-          fill-opacity="0.6"
-          stroke="#365314"
-          stroke-width="1.5"
-          stroke-dasharray="5,3"
-          rx="3"
-        />
-      </template>
-
-      <!-- Unplaced bed list reminder -->
-      <template x-if="unplacedBeds.length > 0">
-        <text x="20" :y="canvasH / zoom - 20" font-size="11" fill="#9ca3af" font-family="system-ui, sans-serif">
-          <tspan x-text="`${unplacedBeds.length} bed(s) not yet placed — use + Add Bed or draw with Rectangle tool`"></tspan>
-        </text>
-      </template>
+      <!-- Unplaced beds reminder (rendered programmatically) -->
+      <g x-ref="reminderLayer" x-effect="renderReminder()"></g>
     </svg>
   </div>
 
@@ -469,6 +346,145 @@ function gardenDesigner(bedsData) {
           this.canvasW = svg.parentElement.clientWidth || 800;
         }
       });
+    },
+
+    // ── SVG rendering helpers (avoids Alpine <template> inside SVG) ───────
+    // NOTE: All data rendered here comes from server-side bed data or
+    // user-drawn coordinates (numeric values + bed names from our own DB).
+    // No untrusted external input is involved — this is safe for innerHTML.
+
+    _escHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    },
+
+    _svgNS: 'http://www.w3.org/2000/svg',
+
+    _createSvgEl(tag, attrs) {
+      const el = document.createElementNS(this._svgNS, tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'textContent') el.textContent = v;
+        else if (k === 'style') el.setAttribute('style', v);
+        else el.setAttribute(k, v);
+      }
+      return el;
+    },
+
+    renderBeds() {
+      const layer = this.$refs.bedsLayer;
+      if (!layer) return;
+      const self = this;
+
+      // Clear existing children
+      while (layer.firstChild) layer.removeChild(layer.firstChild);
+
+      this.placedBeds.forEach(bed => {
+        const selected = self.selectedBed && self.selectedBed.id === bed.id;
+        const fill = self.bedFill(bed);
+        const stroke = selected ? '#365314' : '#86a878';
+        const sw = selected ? 2 : 1;
+        const opacity = selected ? 1 : 0.9;
+
+        const g = self._createSvgEl('g', { 'data-bed-id': bed.id, style: 'cursor:move;', opacity: opacity });
+
+        if (bed.canvas_points && bed.canvas_points.length > 0) {
+          // Polygon bed
+          const pts = bed.canvas_points.map(p => p.join(',')).join(' ');
+          g.appendChild(self._createSvgEl('polygon', { points: pts, fill: fill, stroke: stroke, 'stroke-width': sw }));
+          const c = self.polygonCentroid(bed.canvas_points);
+          g.appendChild(self._createSvgEl('text', {
+            x: c[0], y: c[1] + 4, 'text-anchor': 'middle', 'font-size': 11,
+            'font-family': 'system-ui, sans-serif', 'font-weight': 600, fill: '#1a2e05',
+            style: 'pointer-events:none;user-select:none;', textContent: bed.name
+          }));
+        } else {
+          // Rectangle bed
+          const bx = bed.canvas_x, by = bed.canvas_y;
+          const bw = bed.canvas_width || 100, bh = bed.canvas_height || 60;
+          g.appendChild(self._createSvgEl('rect', { x: bx, y: by, width: bw, height: bh, fill: fill, stroke: stroke, 'stroke-width': sw, rx: 3 }));
+
+          // Plant overlay
+          if (self.showPlants && bed.rows) {
+            bed.rows.forEach((row, ri) => {
+              row.slots.forEach((sd, si) => {
+                if (sd.plant) {
+                  g.appendChild(self._createSvgEl('text', {
+                    x: bx + 4 + si * 18, y: by + 14 + ri * 16, 'font-size': 9,
+                    fill: self.cropTextColor(sd.plant.crop_type),
+                    'font-family': 'system-ui, sans-serif', 'font-weight': 600,
+                    textContent: sd.plant.variety_name.slice(0, 2)
+                  }));
+                }
+              });
+            });
+          }
+
+          // Label
+          g.appendChild(self._createSvgEl('text', {
+            x: bx + bw / 2, y: by + bh / 2 + 4, 'text-anchor': 'middle', 'font-size': 11,
+            'font-family': 'system-ui, sans-serif', 'font-weight': 600, fill: '#1a2e05',
+            style: 'pointer-events:none;user-select:none;', textContent: bed.name
+          }));
+
+          // Resize handle
+          if (selected) {
+            const handle = self._createSvgEl('rect', {
+              x: bx + bw - 6, y: by + bh - 6, width: 10, height: 10,
+              fill: '#365314', rx: 2, style: 'cursor:se-resize;'
+            });
+            handle.addEventListener('mousedown', (e) => { e.stopPropagation(); self.onResizeHandleMouseDown(e, bed); });
+            handle.addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); self.onResizeHandleTouchStart(e, bed); });
+            g.appendChild(handle);
+          }
+        }
+
+        // Attach bed interaction events
+        g.addEventListener('mousedown', (e) => { e.stopPropagation(); self.onBedMouseDown(e, bed); });
+        g.addEventListener('touchstart', (e) => { e.stopPropagation(); e.preventDefault(); self.onBedTouchStart(e, bed); });
+
+        layer.appendChild(g);
+      });
+    },
+
+    renderPreview() {
+      const layer = this.$refs.previewLayer;
+      if (!layer) return;
+      while (layer.firstChild) layer.removeChild(layer.firstChild);
+
+      // Polygon in progress
+      if (this.activeTool === 'polygon' && this.polyPoints.length > 0) {
+        const allPts = [...this.polyPoints];
+        if (this.polyPreview) allPts.push(this.polyPreview);
+        const ptsStr = allPts.map(p => p.join(',')).join(' ');
+        layer.appendChild(this._createSvgEl('polyline', {
+          points: ptsStr, fill: 'none', stroke: '#365314', 'stroke-width': 1.5, 'stroke-dasharray': '5,3'
+        }));
+        this.polyPoints.forEach(pt => {
+          layer.appendChild(this._createSvgEl('circle', { cx: pt[0], cy: pt[1], r: 4, fill: '#365314', opacity: 0.7 }));
+        });
+      }
+
+      // Rectangle being drawn
+      if (this.activeTool === 'rect' && this.drawRect) {
+        const r = this.drawRect;
+        layer.appendChild(this._createSvgEl('rect', {
+          x: r.x, y: r.y, width: r.w, height: r.h,
+          fill: '#d1fae5', 'fill-opacity': 0.6, stroke: '#365314',
+          'stroke-width': 1.5, 'stroke-dasharray': '5,3', rx: 3
+        }));
+      }
+    },
+
+    renderReminder() {
+      const layer = this.$refs.reminderLayer;
+      if (!layer) return;
+      while (layer.firstChild) layer.removeChild(layer.firstChild);
+      if (this.unplacedBeds.length > 0) {
+        layer.appendChild(this._createSvgEl('text', {
+          x: 20, y: this.canvasH / this.zoom - 20, 'font-size': 11,
+          fill: '#9ca3af', 'font-family': 'system-ui, sans-serif',
+          textContent: this.unplacedBeds.length + ' bed(s) not yet placed \u2014 use + Add Bed or draw with Rectangle tool'
+        }));
+      }
     },
 
     // ── Computed helpers ─────────────────────────────────────────────────────
