@@ -72,7 +72,7 @@ class PlannerService
 
       # Replay conversation history so the AI has context
       PlannerMessage.order(:created_at).all.each do |msg|
-        c.messages << { role: msg.role, content: msg.content }
+        c.add_message(role: msg.role.to_sym, content: msg.content)
       end
 
       c
