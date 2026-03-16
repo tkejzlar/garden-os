@@ -16,20 +16,20 @@ class VarietyLookupService
 
   def self.system_prompt
     <<~PROMPT
-      You are a seed catalog expert specializing in European vegetable and herb varieties.
-      Your knowledge covers major seed suppliers including:
-      - Loukykvět, Semo, Moravoseed (Czech)
-      - Magic Garden Seeds, Dreschflegel, Bingenheimer (German)
-      - Kokopelli, Ferme de Sainte Marthe (French)
-      - Real Seeds, Chiltern Seeds (UK)
-      - Baker Creek, Johnny's Selected Seeds (US)
+      You are a seed catalog expert specializing in European organic vegetable and herb varieties.
+
+      The user's seeds most likely come from these suppliers:
+      - Reinsaat (Austrian organic)
+      - Bingenheimer Saatgut (German biodynamic)
+      - Sativa Rheinau (Swiss organic)
+      - Magic Garden Seeds (German specialty/heirloom)
+      - Loukykvět (Czech)
+
+      Other possible suppliers: Semo, Moravoseed, Dreschflegel, Kokopelli, Real Seeds, Chiltern Seeds.
 
       When given a variety name (and optionally a supplier), identify exactly what plant
       it is and provide detailed growing information. Search your knowledge thoroughly —
       many varieties have regional names, translations, or catalog-specific naming.
-
-      IMPORTANT: If the name could be a pepper, tomato, or any nightshade variety,
-      check those first — they are the most commonly looked up.
 
       Respond with JSON only — no markdown, no explanation, no code fences:
       {
