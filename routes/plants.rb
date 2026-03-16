@@ -1,6 +1,7 @@
 require_relative "../models/plant"
 require_relative "../models/bed"
 require_relative "../models/stage_history"
+require_relative "../models/harvest"
 
 class GardenApp
   get "/plants" do
@@ -10,9 +11,10 @@ class GardenApp
   end
 
   get "/plants/:id" do
-    @plant = Plant[params[:id].to_i]
+    @plant    = Plant[params[:id].to_i]
     halt 404, "Plant not found" unless @plant
-    @history = StageHistory.where(plant_id: @plant.id).order(:changed_at).all
+    @history  = StageHistory.where(plant_id: @plant.id).order(:changed_at).all
+    @harvests = Harvest.where(plant_id: @plant.id).order(Sequel.desc(:date)).all
     erb :"plants/show"
   end
 
@@ -21,6 +23,48 @@ class GardenApp
     halt 404 unless plant
     plant.advance_stage!(params[:stage], note: params[:note])
     redirect back
+  end
+
+  post "/plants/:id/harvests" do
+    plant = Plant[params[:id].to_i]
+    halt 404 unless plant
+
+    harvest = Harvest.new(
+      plant_id: plant.id,
+      date:     params[:date].to_s.empty? ? Date.today : Date.parse(params[:date]),
+      quantity: params[:quantity],
+      notes:    params[:notes].to_s.strip.then { |n| n.empty? ? nil : n }
+    )
+
+    if harvest.valid?
+      harvest.save
+    else
+      # Re-render show with error — simple approach consistent with existing redirect pattern
+      @plant   = plant
+      @history = StageHistory.where(plant_id: plant.id).order(:changed_at).all
+      @harvests = Harvest.where(plant_id: plant.id).order(Sequel.desc(:date)).all
+      @harvest_error = harvest.errors.full_messages.join(", ")
+      return erb :"plants/show"
+    end
+
+    redirect "/plants/#{plant.id}"
+  end
+
+  get "/api/plants/:id/harvests" do
+    plant = Plant[params[:id].to_i]
+    halt 404 unless plant
+
+    harvests = Harvest.where(plant_id: plant.id).order(Sequel.desc(:date)).all.map do |h|
+      {
+        id:         h.id,
+        date:       h.date.to_s,
+        quantity:   h.quantity,
+        notes:      h.notes,
+        created_at: h.created_at.to_s
+      }
+    end
+
+    json harvests
   end
 
   post "/plants/batch_advance" do
