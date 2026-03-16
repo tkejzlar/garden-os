@@ -22,6 +22,27 @@ class GardenApp
     end
   end
 
+  # Fetch enriched detail for a catalog entry (scrapes product page on first call, caches)
+  get "/api/seeds/catalog/:id" do
+    require_relative "../models/seed_catalog_entry"
+    entry = SeedCatalogEntry[params[:id].to_i]
+    halt 404, json(error: "Not found") unless entry
+
+    entry.enrich!
+    json({
+      id: entry.id,
+      variety_name: entry.variety_name,
+      crop_type: entry.crop_type,
+      supplier: entry.supplier,
+      supplier_url: entry.supplier_url,
+      description: entry.description,
+      germination_temp: entry.germination_temp,
+      spacing: entry.spacing,
+      sowing_info: entry.sowing_info,
+      notes: entry.notes_summary
+    })
+  end
+
   get "/seeds/new" do
     @packet = SeedPacket.new
     erb :"seeds/show"

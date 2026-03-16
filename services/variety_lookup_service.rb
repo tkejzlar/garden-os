@@ -108,7 +108,7 @@ class VarietyLookupService
       source:       "catalog",
       supplier:     best.supplier,
       supplier_url: best.supplier_url,
-      matches:      results.map { |r| { name: r.variety_name, supplier: r.supplier, crop_type: r.crop_type } }
+      matches:      results.map { |r| { id: r.id, name: r.variety_name, supplier: r.supplier, crop_type: r.crop_type } }
     }
   end
 

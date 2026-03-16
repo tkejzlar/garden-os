@@ -33,6 +33,65 @@ class SeedCatalogEntry < Sequel::Model
        .strip
   end
 
+  # Fetch and cache product detail from supplier page
+  def enrich!
+    return self if description && !description.empty?  # already enriched
+    return self unless supplier_url && !supplier_url.empty?
+
+    require_relative "../services/catalog_scraper"
+    doc = CatalogScraper.fetch_page(supplier_url)
+    return self unless doc
+
+    # Extract text content — works for most supplier pages
+    # Try JSON-LD first (Reinsaat uses this)
+    json_ld = doc.css('script[type="application/ld+json"]').map { |s| JSON.parse(s.text) rescue nil }.compact
+    product = json_ld.find { |j| j["@type"] == "Product" }
+
+    if product
+      update(
+        description: product["description"]&.strip,
+        article_number: product["model"] || product["sku"]
+      )
+    end
+
+    # Fallback: meta description
+    if description.nil? || description.empty?
+      meta = doc.at_css('meta[name="description"]')
+      update(description: meta["content"].strip) if meta && meta["content"] && !meta["content"].strip.empty?
+    end
+
+    # Fallback: find a paragraph that looks like a product description
+    # (contains plant-related keywords, not store hours or legal text)
+    if description.nil? || description.empty?
+      plant_keywords = /fruit|taste|variety|plant|grow|seed|sow|harvest|ripen|resistant|height|flavor|colour|color|leaf|flower/i
+      skip_keywords = /cookie|©|phone|shop.*open|monday|shipping|delivery|cart|checkout|privacy|login/i
+      doc.css("p, .product-description, [itemprop='description']").each do |el|
+        txt = el.text.strip
+        if txt.length > 40 && txt.length < 600 && txt.match?(plant_keywords) && !txt.match?(skip_keywords)
+          update(description: txt)
+          break
+        end
+      end
+    end
+
+    # Try to extract growing info from page text
+    text = doc.css("body").text
+    if (m = text.match(/(\d{1,2})\s*[-–]\s*(\d{1,2})\s*°C/))
+      update(germination_temp: "#{m[1]}-#{m[2]}°C")
+    end
+    if (m = text.match(/(\d{2,3})\s*[x×]\s*(\d{2,3})\s*cm/))
+      update(spacing: "#{m[1]}×#{m[2]}cm")
+    end
+    if (m = text.match(/(\d+[.,]?\d*)\s*[-–]\s*(\d+[.,]?\d*)\s*cm.*(?:depth|deep|sowing)/i))
+      update(sowing_info: "Sowing depth: #{m[0]}")
+    end
+
+    reload
+  rescue => e
+    warn "Enrich error for #{variety_name}: #{e.message}"
+    self
+  end
+
   def notes_summary
     parts = [
       crop_subcategory,

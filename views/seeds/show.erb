@@ -58,29 +58,32 @@
             } catch(e) { /* silent */ }
           },
 
+          supplierDisplayName(key) {
+            const names = { reinsaat: 'Reinsaat', bingenheimer: 'Bingenheimer', sativa: 'Sativa', magic_garden: 'Magic Garden Seeds', loukykvet: 'Loukykvět' };
+            return names[key] || key;
+          },
+
           selectSuggestion(match) {
             this.query = match.name;
             this.$refs.crop_type.value = match.crop_type;
+            this.source = this.supplierDisplayName(match.supplier);
             this.showSuggestions = false;
             this.catalogMatch = match;
-            // Fetch full details for the notes
-            this.fetchDetails(match.name);
+            // Fetch enriched detail from the catalog entry's product page
+            if (match.id) {
+              this.fetchCatalogDetail(match.id);
+            }
           },
 
-          async fetchDetails(name) {
+          async fetchCatalogDetail(catalogId) {
             this.loading = true;
             try {
-              let url = '/api/seeds/lookup?q=' + encodeURIComponent(name);
-              const src = this.source.trim();
-              if (src) url += '&source=' + encodeURIComponent(src);
-              const resp = await fetch(url);
+              const resp = await fetch('/api/seeds/catalog/' + catalogId);
               if (!resp.ok) return;
               const data = await resp.json();
-              if (data.crop_type) this.$refs.crop_type.value = data.crop_type;
               if (data.notes) this.$refs.notes.value = data.notes;
-              if (data.source === 'catalog') {
-                this.catalogMatch = { name, supplier: data.supplier, crop_type: data.crop_type };
-              }
+              if (data.crop_type) this.$refs.crop_type.value = data.crop_type;
+              this.catalogMatch = { name: data.variety_name, supplier: data.supplier, crop_type: data.crop_type };
             } catch(e) { /* silent */ }
             finally { this.loading = false; }
           },
