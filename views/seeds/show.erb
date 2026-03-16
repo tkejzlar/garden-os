@@ -48,22 +48,55 @@
   </p>
 
   <form method="post" action="<%= new_record ? '/seeds' : "/seeds/#{@packet.id}" %>"
-        class="flex flex-col gap-4">
+        class="flex flex-col gap-4"
+        x-data="{
+          loading: false,
+          looked_up: false,
+          ai_notes: '',
+          async lookup() {
+            const name = this.$refs.variety_name.value.trim();
+            if (!name) return;
+            this.loading = true;
+            try {
+              const resp = await fetch('/api/seeds/lookup?q=' + encodeURIComponent(name));
+              if (!resp.ok) throw new Error('Lookup failed');
+              const data = await resp.json();
+              if (data.crop_type) this.$refs.crop_type.value = data.crop_type;
+              if (data.notes) {
+                this.$refs.notes.value = data.notes;
+                this.ai_notes = data.notes;
+              }
+              this.looked_up = true;
+            } catch(e) {
+              console.error(e);
+              this.ai_notes = 'Lookup failed — try again or fill in manually.';
+            } finally {
+              this.loading = false;
+            }
+          }
+        }">
     <% unless new_record %>
       <input type="hidden" name="_method" value="PATCH">
     <% end %>
 
     <div>
       <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Variety name *</label>
-      <input type="text" name="variety_name" required
-             value="<%= @packet.variety_name %>"
-             class="w-full rounded-lg px-3 py-2.5 text-sm border"
-             style="border-color: #e5e7eb; color: var(--text-primary);">
+      <div class="flex gap-2">
+        <input type="text" name="variety_name" x-ref="variety_name" required
+               value="<%= @packet.variety_name %>" class="flex-1 rounded-lg px-3 py-2.5 text-sm border"
+               style="border-color: #e5e7eb;">
+        <button type="button" @click="lookup()" :disabled="loading"
+                class="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+                style="background: var(--green-900); color: white;">
+          <span x-show="!loading">🔍 Look up</span>
+          <span x-show="loading">Looking up...</span>
+        </button>
+      </div>
     </div>
 
     <div>
       <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Crop type *</label>
-      <input type="text" name="crop_type" required
+      <input type="text" name="crop_type" x-ref="crop_type" required
              value="<%= @packet.crop_type %>"
              placeholder="e.g. tomato, herb, pepper"
              class="w-full rounded-lg px-3 py-2.5 text-sm border"
@@ -116,10 +149,16 @@
 
     <div>
       <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Notes</label>
-      <textarea name="notes" rows="3"
+      <textarea name="notes" x-ref="notes" rows="3"
                 class="w-full rounded-lg px-3 py-2.5 text-sm border resize-none"
                 style="border-color: #e5e7eb; color: var(--text-primary);"><%= @packet.notes %></textarea>
     </div>
+
+    <template x-if="looked_up && ai_notes">
+      <div class="rounded-lg px-3 py-2.5 text-xs" style="background: #f0fdf4; color: #365314; border: 1px solid #86efac;">
+        <strong>AI says:</strong> <span x-text="ai_notes"></span>
+      </div>
+    </template>
 
     <button type="submit"
             class="w-full py-3 rounded-xl font-semibold text-sm text-white transition hover:opacity-90"

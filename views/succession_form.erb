@@ -1,0 +1,101 @@
+<%# views/succession_form.erb %>
+<% new_record = @plan.new? %>
+
+<a href="/succession" class="text-sm hover:underline mb-5 inline-block" style="color: var(--green-900);">
+  &larr; Back to Plan
+</a>
+
+<h1 class="text-2xl font-bold mb-5" style="color: var(--text-primary);">
+  <%= new_record ? "New Succession Plan" : "Edit #{@plan.crop}" %>
+</h1>
+
+<div class="px-4 py-4" style="background: white; border-radius: var(--card-radius); box-shadow: var(--card-shadow);">
+  <form method="post"
+        action="<%= new_record ? '/succession/plans' : "/succession/plans/#{@plan.id}" %>"
+        class="flex flex-col gap-4">
+    <% unless new_record %>
+      <input type="hidden" name="_method" value="PATCH">
+    <% end %>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Crop name *</label>
+      <input type="text" name="crop" required
+             value="<%= @plan.crop %>"
+             placeholder="e.g. Lettuce, Radish"
+             class="w-full rounded-lg px-3 py-2.5 text-sm border"
+             style="border-color: #e5e7eb;">
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Varieties (comma-separated)</label>
+      <input type="text" name="varieties"
+             value="<%= @plan.respond_to?(:varieties_list) ? @plan.varieties_list.join(', ') : '' %>"
+             placeholder="e.g. Tre Colori, Qualitas, Lollo Rossa"
+             class="w-full rounded-lg px-3 py-2.5 text-sm border"
+             style="border-color: #e5e7eb;">
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Interval (days) *</label>
+        <input type="number" name="interval_days" required min="1" max="365"
+               value="<%= @plan.interval_days %>"
+               placeholder="e.g. 18"
+               class="w-full rounded-lg px-3 py-2.5 text-sm border"
+               style="border-color: #e5e7eb;">
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Total sowings *</label>
+        <input type="number" name="total_planned_sowings" required min="1" max="52"
+               value="<%= @plan.total_planned_sowings %>"
+               placeholder="e.g. 8"
+               class="w-full rounded-lg px-3 py-2.5 text-sm border"
+               style="border-color: #e5e7eb;">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Season start</label>
+        <input type="date" name="season_start"
+               value="<%= @plan.season_start %>"
+               class="w-full rounded-lg px-3 py-2.5 text-sm border"
+               style="border-color: #e5e7eb;">
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Season end</label>
+        <input type="date" name="season_end"
+               value="<%= @plan.season_end %>"
+               class="w-full rounded-lg px-3 py-2.5 text-sm border"
+               style="border-color: #e5e7eb;">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Target beds (comma-separated)</label>
+      <input type="text" name="target_beds"
+             value="<%= @plan.respond_to?(:target_beds_list) ? @plan.target_beds_list.join(', ') : '' %>"
+             placeholder="e.g. BB1, BB2, Corner"
+             class="w-full rounded-lg px-3 py-2.5 text-sm border"
+             style="border-color: #e5e7eb;">
+    </div>
+
+    <button type="submit"
+            class="w-full py-3 rounded-xl font-semibold text-sm text-white transition hover:opacity-90"
+            style="background: var(--green-900);">
+      <%= new_record ? "Create Plan" : "Save Changes" %>
+    </button>
+  </form>
+</div>
+
+<% unless new_record %>
+  <form method="post" action="/succession/plans/<%= @plan.id %>"
+        onsubmit="return confirm('Delete this succession plan?')" class="mt-4">
+    <input type="hidden" name="_method" value="DELETE">
+    <button type="submit"
+            class="w-full py-3 rounded-xl font-semibold text-sm transition hover:opacity-80"
+            style="background: #fef2f2; color: #991b1b;">
+      Delete plan
+    </button>
+  </form>
+<% end %>
