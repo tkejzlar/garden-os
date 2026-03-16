@@ -15,3 +15,5 @@ class GardenApp < Sinatra::Base
     json status: "ok"
   end
 end
+
+require_relative "routes/dashboard"

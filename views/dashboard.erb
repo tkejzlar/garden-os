@@ -1,0 +1,115 @@
+<h1 class="text-2xl font-bold mb-6">Good morning</h1>
+
+<% if @weather %>
+  <div class="bg-blue-50 rounded-lg p-4 mb-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="font-medium text-blue-900">Now: <%= @weather[:current_temp] %>&deg;C — <%= @weather[:condition] %></p>
+      </div>
+    </div>
+    <% if @weather[:forecast]&.any? %>
+      <div class="flex gap-4 mt-2">
+        <% @weather[:forecast].each do |day| %>
+          <div class="text-xs text-blue-700">
+            <p><%= day[:date] %></p>
+            <p><%= day[:high] %>&deg; / <%= day[:low] %>&deg;</p>
+            <p><%= day[:condition] %></p>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="bg-blue-50 rounded-lg p-4 mb-6">
+    <p class="text-sm text-blue-600">Weather data unavailable — check HA connection.</p>
+  </div>
+<% end %>
+
+<% if @weather&.dig(:frost_risk) %>
+  <div class="bg-red-100 border border-red-300 rounded-lg p-4 mb-6">
+    <p class="font-bold text-red-700">Frost warning</p>
+    <% min_low = @weather[:forecast]&.map { |f| f[:low] }&.compact&.min %>
+    <p class="text-sm text-red-600">Low of <%= min_low %>&deg;C forecast in next 3 days.</p>
+  </div>
+<% end %>
+
+<section class="mb-6">
+  <h2 class="text-lg font-semibold mb-3">Today's tasks</h2>
+  <% if @today_tasks.empty? %>
+    <p class="text-stone-500">Nothing scheduled today.</p>
+  <% else %>
+    <ul class="space-y-2">
+      <% @today_tasks.each do |task| %>
+        <li class="bg-white rounded-lg p-3 shadow-sm flex items-center justify-between"
+            x-data="{ done: false }">
+          <div>
+            <span class="font-medium"><%= task.title %></span>
+            <span class="ml-2 text-xs px-2 py-0.5 rounded-full
+              <%= task.priority == 'must' ? 'bg-red-100 text-red-700' :
+                  task.priority == 'should' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-stone-100 text-stone-600' %>">
+              <%= task.priority %>
+            </span>
+          </div>
+          <button @click="done = true; fetch('/tasks/<%= task.id %>/complete', {method: 'POST'})"
+                  x-show="!done"
+                  class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">
+            Done
+          </button>
+          <span x-show="done" class="text-green-600 text-sm">Completed</span>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</section>
+
+<section class="mb-6">
+  <h2 class="text-lg font-semibold mb-3">Germination watch</h2>
+  <% if @germination_watch.empty? %>
+    <p class="text-stone-500">Nothing germinating right now.</p>
+  <% else %>
+    <div class="grid grid-cols-2 gap-3">
+      <% @germination_watch.each do |plant| %>
+        <div class="bg-amber-50 rounded-lg p-3 border border-amber-200">
+          <p class="font-medium"><%= plant.variety_name %></p>
+          <p class="text-sm text-stone-600"><%= plant.crop_type %></p>
+          <p class="text-sm">
+            Day <strong><%= plant.days_in_stage %></strong> —
+            <span class="text-amber-700"><%= plant.lifecycle_stage.tr('_', ' ') %></span>
+          </p>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</section>
+
+<section class="mb-6">
+  <h2 class="text-lg font-semibold mb-3">Upcoming this week</h2>
+  <% if @upcoming_tasks.empty? %>
+    <p class="text-stone-500">Clear week ahead.</p>
+  <% else %>
+    <ul class="space-y-2">
+      <% @upcoming_tasks.each do |task| %>
+        <li class="bg-white rounded-lg p-3 shadow-sm">
+          <span class="text-sm text-stone-500"><%= task.due_date.strftime("%a %b %-d") %></span>
+          <span class="ml-2 font-medium"><%= task.title %></span>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</section>
+
+<section class="mb-6">
+  <h2 class="text-lg font-semibold mb-3">AI insights</h2>
+  <% if @advisories.empty? %>
+    <p class="text-stone-500">No advisories today yet.</p>
+  <% else %>
+    <div class="space-y-2">
+      <% @advisories.each do |adv| %>
+        <div class="bg-purple-50 rounded-lg p-3 border border-purple-200">
+          <p class="text-sm"><%= adv.content_hash["summary"] rescue adv.content %></p>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</section>
