@@ -192,73 +192,58 @@ class GardenApp
     })
   end
 
-  # SSE streaming endpoint — background thread + queue to avoid Puma write timeout
-  get "/succession/planner/stream" do
-    message = params[:message].to_s.strip
-    halt 400, "message required" if message.empty?
+  # ── Async planner: POST kicks off AI in background, GET polls for result ──
+
+  # In-memory store for pending requests (single user, single process)
+  PLANNER_RESULTS = {}
+  PLANNER_MUTEX = Mutex.new
+
+  post "/succession/planner/ask" do
+    request.body.rewind
+    body = begin
+      JSON.parse(request.body.read)
+    rescue
+      halt 400, json(error: "Invalid JSON")
+    end
+
+    message = body["message"].to_s.strip
+    halt 400, json(error: "message required") if message.empty?
 
     require_relative "../services/planner_service"
     require_relative "../services/garden_logger"
+    require "securerandom"
 
-    # Queue bridges the background AI thread and the SSE response
-    queue = Thread::Queue.new
+    request_id = SecureRandom.hex(8)
+    PLANNER_MUTEX.synchronize { PLANNER_RESULTS[request_id] = { status: "pending" } }
 
-    # Run AI in background thread — pushes events to queue
-    ai_thread = Thread.new do
+    # AI runs in background thread — result stored when done
+    Thread.new do
       begin
+        GardenLogger.info "[Planner/Async] Starting #{request_id}"
         service = PlannerService.new
-        service.send_message_streaming(message) do |event|
-          queue.push(event)
+        result = service.send_message(message)
+        GardenLogger.info "[Planner/Async] #{request_id} done, #{result[:content]&.length} chars"
+
+        PLANNER_MUTEX.synchronize do
+          PLANNER_RESULTS[request_id] = { status: "done", content: result[:content], draft: result[:draft] }
         end
       rescue => e
-        GardenLogger.error "[Planner/SSE] AI thread error: #{e.class}: #{e.message}"
-        queue.push({ type: "error", content: e.message })
-      end
-      queue.push(:done)
-    end
-
-    # SSE body reads from queue, sends keepalives while waiting
-    sse_body = Enumerator.new do |yielder|
-      yielder << ": connected\n\n"
-
-      loop do
-        # Non-blocking poll with 2s timeout — yields keepalive if nothing ready
-        event = nil
-        begin
-          event = queue.pop(timeout: 2)
-        rescue ThreadError
-          # Ruby < 3.2 doesn't support timeout — use non_block
-          event = queue.pop(true) rescue nil
-        end
-
-        if event.nil?
-          # Nothing from AI yet — send keepalive to prevent Puma timeout
-          yielder << ": keepalive\n\n"
-          next
-        end
-
-        break if event == :done
-
-        case event[:type]
-        when "chunk"
-          yielder << "data: #{JSON.generate({ type: "chunk", content: event[:content] })}\n\n"
-        when "draft"
-          yielder << "data: #{JSON.generate({ type: "draft", draft: event[:draft] })}\n\n"
-        when "error"
-          yielder << "data: #{JSON.generate({ type: "error", content: event[:content] })}\n\n"
-          break
+        GardenLogger.error "[Planner/Async] #{request_id} error: #{e.message}"
+        PLANNER_MUTEX.synchronize do
+          PLANNER_RESULTS[request_id] = { status: "done", content: "Error: #{e.message}", draft: nil }
         end
       end
-
-      yielder << "data: #{JSON.generate({ type: "done" })}\n\n"
-      ai_thread.join(5) # clean up
+      # Cleanup after 5 min
+      Thread.new { sleep 300; PLANNER_MUTEX.synchronize { PLANNER_RESULTS.delete(request_id) } }
     end
 
-    [200, {
-      "Content-Type" => "text/event-stream",
-      "Cache-Control" => "no-cache",
-      "X-Accel-Buffering" => "no"
-    }, sse_body]
+    json({ request_id: request_id })
+  end
+
+  get "/succession/planner/result/:id" do
+    result = PLANNER_MUTEX.synchronize { PLANNER_RESULTS[params[:id]] }
+    halt 404, json(error: "Not found") unless result
+    json result
   end
 
   post "/succession/planner/commit" do
