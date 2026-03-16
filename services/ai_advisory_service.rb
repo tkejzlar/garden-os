@@ -1,10 +1,18 @@
+# services/ai_advisory_service.rb
 require "json"
+require_relative "../config/ruby_llm"
 require_relative "../models/plant"
 require_relative "../models/task"
 require_relative "../models/advisory"
 require_relative "../db/seeds/seed_varieties"
 
 class AIAdvisoryService
+  DEFAULT_MODEL = "claude-sonnet-4-6"
+
+  def self.model_id
+    ENV.fetch("GARDEN_AI_MODEL", DEFAULT_MODEL)
+  end
+
   def self.system_prompt
     <<~PROMPT
       You are a garden advisor for a productive vegetable garden in Prague, Czech Republic (zone 6b/7a).
@@ -65,23 +73,15 @@ class AIAdvisoryService
   end
 
   def self.run_daily!
-    return unless ENV["ANTHROPIC_API_KEY"]
-
-    require "anthropic"
-
     context = build_context
-    client = Anthropic::Client.new
 
-    response = client.messages.create(
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1024,
-      system: system_prompt,
-      messages: [
-        { role: "user", content: JSON.pretty_generate(context) }
-      ]
-    )
+    chat = RubyLLM.chat(model: model_id)
+      .with_instructions(system_prompt)
+      .with_temperature(0.3)
 
-    text = response.content.first.text
+    response = chat.ask(JSON.pretty_generate(context))
+    text = response.content
+
     parsed = JSON.parse(text)
     advisories = parse_response(parsed)
 

@@ -29,4 +29,15 @@ class TestAIAdvisoryService < GardenTest
     prompt = AIAdvisoryService.system_prompt
     assert_includes prompt, "Prague"
   end
+
+  def test_default_model
+    assert_equal "claude-sonnet-4-6", AIAdvisoryService.model_id
+  end
+
+  def test_model_from_env
+    ENV["GARDEN_AI_MODEL"] = "gpt-4o"
+    assert_equal "gpt-4o", AIAdvisoryService.model_id
+  ensure
+    ENV.delete("GARDEN_AI_MODEL")
+  end
 end
