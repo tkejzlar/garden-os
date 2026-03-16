@@ -1,5 +1,153 @@
 <%# views/succession.erb — Plan Hub %>
 
+<script>
+  window.__PLANNER_MESSAGES__ = <%= @planner_messages.map { |m|
+    { role: m.role, content: m.content, draft: m.draft_data, created_at: m.created_at.to_i }
+  }.to_json %>;
+</script>
+
+<!-- AI Garden Planner Chat -->
+<div x-data="plannerChat()" class="mb-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-3">
+    <button @click="chatOpen = !chatOpen" class="flex items-center gap-2">
+      <h2 class="text-lg font-semibold" style="color: var(--text-primary);">Garden Planner</h2>
+      <span x-text="chatOpen ? '▼' : '▶'" class="text-xs" style="color: var(--gray-400);"></span>
+    </button>
+    <button x-show="chatOpen" @click="clearChat()" class="text-xs" style="color: var(--gray-400);">New chat</button>
+  </div>
+
+  <!-- Chat area -->
+  <div x-show="chatOpen" x-transition>
+    <!-- Messages -->
+    <div x-ref="chatMessages" class="space-y-3 mb-3 overflow-y-auto" style="max-height: 50vh;">
+      <template x-for="msg in messages" :key="msg.id || msg.created_at">
+        <!-- User message -->
+        <div x-show="msg.role === 'user'" class="flex justify-end">
+          <div class="rounded-xl px-4 py-2 text-sm max-w-[80%]" style="background: #d1fae5; color: var(--text-primary);" x-text="msg.content"></div>
+        </div>
+        <!-- AI message -->
+        <div x-show="msg.role === 'assistant'" class="flex justify-start">
+          <div class="rounded-xl px-4 py-3 text-sm max-w-[85%]" style="background: white; box-shadow: var(--card-shadow);">
+            <div x-html="msg.content.replace(/\n/g, '<br>')"></div>
+            <!-- Draft card if present -->
+            <template x-if="msg.draft">
+              <div class="mt-3 p-3 rounded-lg" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
+                <p class="text-xs font-semibold mb-2" style="color: #166534;">Plan Draft</p>
+                <p class="text-xs mb-1" x-text="(msg.draft.assignments?.length || 0) + ' bed assignments'"></p>
+                <p class="text-xs mb-1" x-text="(msg.draft.successions?.length || 0) + ' succession schedules'"></p>
+                <p class="text-xs mb-2" x-text="(msg.draft.tasks?.length || 0) + ' tasks'"></p>
+                <button @click="commitDraft(msg.draft)" :disabled="msg.committed"
+                  class="text-xs px-3 py-1.5 rounded-lg font-medium"
+                  :style="msg.committed ? 'background: #d1fae5; color: #166534;' : 'background: var(--green-900); color: white;'"
+                  x-text="msg.committed ? 'Plan created ✓' : 'Create this plan'">
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+      <!-- Thinking indicator -->
+      <div x-show="sending" class="flex justify-start">
+        <div class="rounded-xl px-4 py-3 text-sm flex items-center gap-2" style="background: white; box-shadow: var(--card-shadow); color: var(--gray-500);">
+          <svg width="14" height="14" viewBox="0 0 16 16" style="animation: spin 0.8s linear infinite;">
+            <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="8" stroke-linecap="round"/>
+          </svg>
+          Thinking...
+        </div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="flex gap-2">
+      <input type="text" x-model="input" @keydown.enter="sendMessage()"
+             placeholder="What would you like to grow?"
+             class="flex-1 rounded-xl px-4 py-2.5 text-sm border"
+             style="border-color: #e5e7eb;" :disabled="sending">
+      <button @click="sendMessage()" :disabled="sending || !input.trim()"
+              class="px-4 py-2.5 rounded-xl text-sm font-medium"
+              style="background: var(--green-900); color: white;">
+        Send
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+function plannerChat() {
+  return {
+    messages: window.__PLANNER_MESSAGES__ || [],
+    input: '',
+    sending: false,
+    chatOpen: true,
+
+    async sendMessage() {
+      const text = this.input.trim();
+      if (!text || this.sending) return;
+
+      this.messages.push({ role: 'user', content: text, created_at: Date.now() });
+      this.input = '';
+      this.sending = true;
+      this.scrollToBottom();
+
+      try {
+        const resp = await fetch('/succession/planner/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text })
+        });
+        const data = await resp.json();
+        this.messages.push({
+          role: 'assistant',
+          content: data.content,
+          draft: data.draft,
+          created_at: Date.now()
+        });
+      } catch(e) {
+        this.messages.push({ role: 'assistant', content: 'Sorry, something went wrong.', created_at: Date.now() });
+      }
+      this.sending = false;
+      this.scrollToBottom();
+    },
+
+    async commitDraft(draft) {
+      try {
+        const resp = await fetch('/succession/planner/commit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draft_payload: draft })
+        });
+        const data = await resp.json();
+        if (data.success) {
+          // Mark the draft message as committed
+          const msg = this.messages.find(m => m.draft === draft);
+          if (msg) msg.committed = true;
+          // Reload the page to refresh Gantt + plan cards
+          setTimeout(() => window.location.reload(), 1000);
+        } else {
+          alert('Failed to create plan: ' + (data.errors || []).join(', '));
+        }
+      } catch(e) {
+        alert('Error creating plan');
+      }
+    },
+
+    async clearChat() {
+      if (!confirm('Start a new planning conversation?')) return;
+      await fetch('/succession/planner/messages', { method: 'DELETE' });
+      this.messages = [];
+    },
+
+    scrollToBottom() {
+      this.$nextTick(() => {
+        const el = this.$refs.chatMessages;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+    }
+  };
+}
+</script>
+
 <!-- Plan Management -->
 <div class="mb-4 flex items-center justify-between">
   <h1 class="text-2xl font-bold" style="color: var(--text-primary); letter-spacing: -0.5px;">Plan</h1>
