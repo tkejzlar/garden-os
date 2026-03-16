@@ -50,6 +50,15 @@ class VarietyLookupService
   end
 
   def self.lookup(variety_name, source: nil)
+    # 1. Try local catalog first (instant, accurate)
+    catalog_result = catalog_search(variety_name, source: source)
+    return catalog_result if catalog_result
+
+    # 2. Fall back to AI (slow, less reliable)
+    ai_lookup(variety_name, source: source)
+  end
+
+  def self.ai_lookup(variety_name, source: nil)
     return nil if variety_name.nil? || variety_name.strip.empty?
 
     chat = RubyLLM.chat(model: model_id, provider: provider, assume_model_exists: true)
@@ -66,9 +75,50 @@ class VarietyLookupService
     text = text.sub(/\A```(?:json)?\s*/, "").sub(/\s*```\z/, "")
 
     parsed = JSON.parse(text)
-    parse_response(parsed)
+    result = parse_response(parsed)
+    result[:source] = "ai" if result
+    result
   rescue => e
     warn "VarietyLookup error: #{e.message}"
+    nil
+  end
+
+  def self.catalog_search(variety_name, source: nil)
+    return nil if variety_name.nil? || variety_name.strip.empty?
+    require_relative "../models/seed_catalog_entry"
+
+    results = SeedCatalogEntry.search(variety_name)
+
+    # If source is specified, prefer matches from that supplier
+    if source && !source.to_s.strip.empty?
+      supplier_key = normalize_supplier(source)
+      if supplier_key
+        supplier_matches = results.select { |r| r.supplier == supplier_key }
+        results = supplier_matches unless supplier_matches.empty?
+      end
+    end
+
+    return nil if results.empty?
+
+    # Return the best match
+    best = results.first
+    {
+      crop_type:    best.crop_type,
+      notes:        best.notes_summary,
+      source:       "catalog",
+      supplier:     best.supplier,
+      supplier_url: best.supplier_url,
+      matches:      results.map { |r| { name: r.variety_name, supplier: r.supplier, crop_type: r.crop_type } }
+    }
+  end
+
+  def self.normalize_supplier(source)
+    s = source.to_s.downcase
+    return "reinsaat"     if s.include?("reinsaat")
+    return "bingenheimer" if s.include?("bingen")
+    return "sativa"       if s.include?("sativa")
+    return "magic_garden" if s.include?("magic")
+    return "loukykvet"    if s.include?("louky")
     nil
   end
 

@@ -52,11 +52,15 @@
         x-data="{
           loading: false,
           looked_up: false,
-          ai_notes: '',
+          lookup_source: '',
+          lookup_notes: '',
+          lookup_matches: [],
           async lookup() {
             const name = this.$refs.variety_name.value.trim();
             if (!name) return;
             this.loading = true;
+            this.looked_up = false;
+            this.lookup_matches = [];
             try {
               const source = this.$refs.source ? this.$refs.source.value.trim() : '';
               let url = '/api/seeds/lookup?q=' + encodeURIComponent(name);
@@ -67,15 +71,25 @@
               if (data.crop_type) this.$refs.crop_type.value = data.crop_type;
               if (data.notes) {
                 this.$refs.notes.value = data.notes;
-                this.ai_notes = data.notes;
+                this.lookup_notes = data.notes;
               }
+              if (data.supplier_url) this.$refs.url.value = data.supplier_url;
+              this.lookup_source = data.source || 'ai';
+              this.lookup_matches = (data.matches && data.matches.length > 1) ? data.matches : [];
               this.looked_up = true;
             } catch(e) {
               console.error(e);
-              this.ai_notes = 'Lookup failed — try again or fill in manually.';
+              this.lookup_source = 'error';
+              this.lookup_notes = 'Lookup failed — try again or fill in manually.';
+              this.looked_up = true;
             } finally {
               this.loading = false;
             }
+          },
+          applyMatch(match) {
+            this.$refs.crop_type.value = match.crop_type;
+            this.lookup_source = 'catalog';
+            this.lookup_matches = [];
           }
         }">
     <% unless new_record %>
@@ -98,7 +112,7 @@
     </div>
 
     <div>
-      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Source <span class="font-normal">(helps AI identify the variety)</span></label>
+      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Source <span class="font-normal">(narrows catalog + AI lookup)</span></label>
       <input type="text" name="source" x-ref="source"
              value="<%= @packet.source %>"
              placeholder="e.g. Loukykvět, Magic Garden Seeds"
@@ -143,7 +157,7 @@
 
     <div>
       <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Supplier URL</label>
-      <input type="url" name="url"
+      <input type="url" name="url" x-ref="url"
              value="<%= @packet.url %>"
              placeholder="https://"
              class="w-full rounded-lg px-3 py-2.5 text-sm border"
@@ -157,9 +171,39 @@
                 style="border-color: #e5e7eb; color: var(--text-primary);"><%= @packet.notes %></textarea>
     </div>
 
-    <template x-if="looked_up && ai_notes">
-      <div class="rounded-lg px-3 py-2.5 text-xs" style="background: #f0fdf4; color: #365314; border: 1px solid #86efac;">
-        <strong>AI says:</strong> <span x-text="ai_notes"></span>
+    <template x-if="looked_up && lookup_source === 'catalog'">
+      <div class="rounded-lg px-3 py-2.5 text-xs" style="background: #f0fdf4; color: #166534; border: 1px solid #86efac;">
+        <strong>Found in catalog</strong> <span x-text="lookup_notes ? ' — ' + lookup_notes : ''"></span>
+      </div>
+    </template>
+
+    <template x-if="looked_up && lookup_source === 'ai'">
+      <div class="rounded-lg px-3 py-2.5 text-xs" style="background: #fffbeb; color: #92400e; border: 1px solid #fcd34d;">
+        <strong>AI suggestion — verify before saving.</strong> <span x-text="lookup_notes ? ' ' + lookup_notes : ''"></span>
+      </div>
+    </template>
+
+    <template x-if="looked_up && lookup_source === 'error'">
+      <div class="rounded-lg px-3 py-2.5 text-xs" style="background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5;">
+        <span x-text="lookup_notes"></span>
+      </div>
+    </template>
+
+    <template x-if="lookup_matches.length > 0">
+      <div class="rounded-lg px-3 py-2.5 text-xs" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+        <p class="font-medium mb-2" style="color: var(--text-secondary);">Multiple matches — click to apply:</p>
+        <div class="flex flex-col gap-1">
+          <template x-for="match in lookup_matches" :key="match.name + match.supplier">
+            <button type="button" @click="applyMatch(match)"
+                    class="text-left px-2 py-1.5 rounded hover:opacity-80"
+                    style="background: white; border: 1px solid #e5e7eb; color: var(--text-primary);">
+              <span x-text="match.name" class="font-medium"></span>
+              <span class="ml-1" style="color: var(--text-secondary);">—</span>
+              <span x-text="match.crop_type" class="ml-1 capitalize" style="color: var(--text-secondary);"></span>
+              <span class="ml-1 text-xs" style="color: var(--gray-500);">(<span x-text="match.supplier"></span>)</span>
+            </button>
+          </template>
+        </div>
       </div>
     </template>
 
