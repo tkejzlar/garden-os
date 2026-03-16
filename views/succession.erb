@@ -3,6 +3,28 @@
 <style>
   @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
   .streaming-cursor { animation: blink 0.8s ease infinite; color: var(--green-900); font-size: 0.8em; }
+
+  /* Markdown content styling — Tailwind CDN doesn't include @tailwindcss/typography */
+  .md-content h1, .md-content h2, .md-content h3 { font-weight: 700; margin-top: 1em; margin-bottom: 0.5em; color: var(--text-primary); }
+  .md-content h1 { font-size: 1.25em; }
+  .md-content h2 { font-size: 1.1em; }
+  .md-content h3 { font-size: 1em; }
+  .md-content p { margin-bottom: 0.6em; line-height: 1.6; }
+  .md-content ul, .md-content ol { margin: 0.5em 0; padding-left: 1.5em; }
+  .md-content ul { list-style: disc; }
+  .md-content ol { list-style: decimal; }
+  .md-content li { margin-bottom: 0.25em; line-height: 1.5; }
+  .md-content li > ul, .md-content li > ol { margin-top: 0.25em; }
+  .md-content strong { font-weight: 600; }
+  .md-content em { font-style: italic; }
+  .md-content code { background: #f1f5f9; padding: 0.15em 0.3em; border-radius: 3px; font-size: 0.9em; }
+  .md-content pre { background: #f1f5f9; padding: 0.75em 1em; border-radius: 8px; overflow-x: auto; margin: 0.5em 0; }
+  .md-content pre code { background: none; padding: 0; }
+  .md-content blockquote { border-left: 3px solid var(--green-900); padding-left: 0.75em; margin: 0.5em 0; color: var(--text-secondary); }
+  .md-content hr { border: none; border-top: 1px solid #e5e7eb; margin: 1em 0; }
+  .md-content table { width: 100%; border-collapse: collapse; margin: 0.5em 0; font-size: 0.9em; }
+  .md-content th, .md-content td { border: 1px solid #e5e7eb; padding: 0.4em 0.6em; text-align: left; }
+  .md-content th { background: #f8fafc; font-weight: 600; }
 </style>
 
 <script>
@@ -35,7 +57,7 @@
           <!-- AI message -->
           <div x-show="msg.role === 'assistant'" class="flex justify-start">
             <div class="rounded-xl px-4 py-3 text-sm max-w-[85%]" style="background: white; box-shadow: var(--card-shadow);">
-              <div x-html="typeof marked !== 'undefined' ? marked.parse(msg.content || '') : msg.content" class="prose prose-sm max-w-none"></div>
+              <div x-html="typeof marked !== 'undefined' ? marked.parse(msg.content || '') : msg.content" class="md-content"></div>
               <!-- Draft card if present -->
               <template x-if="msg.draft">
                 <div class="mt-3 p-3 rounded-lg" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
