@@ -1,0 +1,5 @@
+# .gitignore
+db/*.db
+.env
+vendor/bundle
+.bundle
