@@ -1,0 +1,46 @@
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">Plants</h1>
+</div>
+
+<div x-data="{ selected: [], batchStage: '' }" class="mb-4">
+  <form method="post" action="/plants/batch_advance" x-show="selected.length > 0"
+        class="bg-green-50 rounded-lg p-3 flex items-center gap-3">
+    <input type="hidden" name="plant_ids" :value="selected.join(',')">
+    <span class="text-sm" x-text="selected.length + ' selected'"></span>
+    <select name="stage" x-model="batchStage" class="text-sm border rounded px-2 py-1">
+      <option value="">Advance to...</option>
+      <% Plant::LIFECYCLE_STAGES.each do |stage| %>
+        <option value="<%= stage %>"><%= stage.tr('_', ' ').capitalize %></option>
+      <% end %>
+    </select>
+    <button type="submit" :disabled="!batchStage"
+            class="text-sm bg-green-600 text-white px-3 py-1 rounded disabled:opacity-50">
+      Apply
+    </button>
+  </form>
+
+  <% @plants.group_by(&:crop_type).sort.each do |crop, plants| %>
+    <h2 class="text-lg font-semibold mt-6 mb-3 capitalize"><%= crop %></h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <% plants.each do |plant| %>
+        <div class="bg-white rounded-lg p-3 shadow-sm flex items-center gap-3">
+          <input type="checkbox" :value="<%= plant.id %>"
+                 @change="$event.target.checked ? selected.push(<%= plant.id %>) : selected = selected.filter(x => x !== <%= plant.id %>)">
+          <a href="/plants/<%= plant.id %>" class="flex-1">
+            <p class="font-medium"><%= plant.variety_name %></p>
+            <p class="text-sm text-stone-500"><%= plant.lifecycle_stage.tr('_', ' ') %></p>
+          </a>
+          <% next_stages = Plant::LIFECYCLE_STAGES.drop(Plant::LIFECYCLE_STAGES.index(plant.lifecycle_stage).to_i + 1).first(2) %>
+          <% next_stages.each do |ns| %>
+            <form method="post" action="/plants/<%= plant.id %>/advance" class="inline">
+              <input type="hidden" name="stage" value="<%= ns %>">
+              <button class="text-xs bg-stone-100 hover:bg-stone-200 px-2 py-1 rounded">
+                <%= ns.tr('_', ' ') %>
+              </button>
+            </form>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</div>

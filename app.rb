@@ -17,3 +17,4 @@ class GardenApp < Sinatra::Base
 end
 
 require_relative "routes/dashboard"
+require_relative "routes/plants"
