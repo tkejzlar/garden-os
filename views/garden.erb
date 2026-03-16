@@ -191,17 +191,38 @@
           />
         </div>
 
-        <!-- Dimensions (read from canvas) -->
-        <div class="grid grid-cols-2 gap-3 mb-3">
-          <div>
-            <p class="text-xs font-medium mb-1" style="color: var(--text-secondary);">Width (canvas px)</p>
-            <p class="text-sm font-semibold" style="color: var(--text-primary);" x-text="selectedBed.canvas_width ? Math.round(selectedBed.canvas_width) : '—'"></p>
+        <!-- Dimensions in cm -->
+        <template x-if="!selectedBed.canvas_points || selectedBed.canvas_points.length === 0">
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="text-xs font-medium mb-1 block" style="color: var(--text-secondary);">Width (cm)</label>
+              <input type="number" min="10" max="2000" step="10"
+                :value="Math.round(selectedBed.canvas_width || 0)"
+                @change="selectedBed.canvas_width = +$event.target.value; patchPosition(selectedBed)"
+                class="w-full rounded-lg px-2 py-1.5 text-sm border"
+                style="border-color: #d1d5db;">
+            </div>
+            <div>
+              <label class="text-xs font-medium mb-1 block" style="color: var(--text-secondary);">Length (cm)</label>
+              <input type="number" min="10" max="2000" step="10"
+                :value="Math.round(selectedBed.canvas_height || 0)"
+                @change="selectedBed.canvas_height = +$event.target.value; patchPosition(selectedBed)"
+                class="w-full rounded-lg px-2 py-1.5 text-sm border"
+                style="border-color: #d1d5db;">
+            </div>
+            <div class="col-span-2">
+              <p class="text-xs" style="color: var(--gray-400);" x-text="'Area: ' + ((selectedBed.canvas_width || 0) * (selectedBed.canvas_height || 0) / 10000).toFixed(1) + ' m²'"></p>
+            </div>
           </div>
-          <div>
-            <p class="text-xs font-medium mb-1" style="color: var(--text-secondary);">Height (canvas px)</p>
-            <p class="text-sm font-semibold" style="color: var(--text-primary);" x-text="selectedBed.canvas_height ? Math.round(selectedBed.canvas_height) : '—'"></p>
+        </template>
+        <!-- Polygon beds: show computed area -->
+        <template x-if="selectedBed.canvas_points && selectedBed.canvas_points.length > 0">
+          <div class="mb-3">
+            <p class="text-xs font-medium mb-1" style="color: var(--text-secondary);">Area</p>
+            <p class="text-sm font-semibold" style="color: var(--text-primary);" x-text="polygonAreaSqm(selectedBed.canvas_points) + ' m²'"></p>
+            <p class="text-xs mt-1" style="color: var(--gray-400);">Polygon bed — dimensions derived from shape (1 unit = 1 cm)</p>
           </div>
-        </div>
+        </template>
 
         <!-- Color picker -->
         <div class="mb-3">
@@ -539,6 +560,18 @@ function gardenDesigner(bedsData) {
       const x = pts.reduce((s, p) => s + p[0], 0) / pts.length;
       const y = pts.reduce((s, p) => s + p[1], 0) / pts.length;
       return [x, y];
+    },
+
+    // Shoelace formula — returns area in cm² (since 1 canvas unit = 1 cm), displayed as m²
+    polygonAreaSqm(pts) {
+      if (!pts || pts.length < 3) return '0.0';
+      let area = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const j = (i + 1) % pts.length;
+        area += pts[i][0] * pts[j][1];
+        area -= pts[j][0] * pts[i][1];
+      }
+      return (Math.abs(area) / 2 / 10000).toFixed(1); // cm² → m²
     },
 
     // Convert a DOM mouse/touch event to SVG coordinate space (accounts for zoom + pan)

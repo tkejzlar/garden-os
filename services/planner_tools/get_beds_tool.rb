@@ -20,15 +20,33 @@ class GetBedsTool < RubyLLM::Tool
       end
 
       # Use real dimensions if set, otherwise derive from canvas (1 canvas unit = 1 cm)
-      length_cm = bed.length || bed.canvas_height&.round
-      width_cm  = bed.width  || bed.canvas_width&.round
+      points = bed.canvas_points_array
+      is_polygon = points && points.length >= 3
+
+      if is_polygon
+        # Shoelace formula for polygon area
+        area_cm2 = 0.0
+        points.each_with_index do |pt, i|
+          j = (i + 1) % points.length
+          area_cm2 += pt[0] * points[j][1]
+          area_cm2 -= points[j][0] * pt[1]
+        end
+        area_sqm = (area_cm2.abs / 2.0 / 10000.0).round(1)
+        length_cm = nil
+        width_cm = nil
+      else
+        length_cm = bed.length || bed.canvas_height&.round
+        width_cm  = bed.width  || bed.canvas_width&.round
+        area_sqm  = (length_cm && width_cm) ? (length_cm * width_cm / 10000.0).round(1) : nil
+      end
 
       {
         name: bed.name,
         bed_type: bed.bed_type,
+        shape: is_polygon ? "polygon" : "rectangle",
         length_cm: length_cm,
         width_cm: width_cm,
-        area_sqm: (length_cm && width_cm) ? (length_cm * width_cm / 10000.0).round(1) : nil,
+        area_sqm: area_sqm,
         orientation: bed.orientation,
         rows: rows,
         total_slots: rows.sum { |r| r[:slots].length },
