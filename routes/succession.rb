@@ -192,7 +192,7 @@ class GardenApp
     })
   end
 
-  # SSE streaming endpoint — uses Rack hijack for Falcon compatibility
+  # SSE streaming endpoint — background thread + queue to avoid Puma write timeout
   get "/succession/planner/stream" do
     message = params[:message].to_s.strip
     halt 400, "message required" if message.empty?
@@ -200,29 +200,58 @@ class GardenApp
     require_relative "../services/planner_service"
     require_relative "../services/garden_logger"
 
-    # Build SSE response as a streaming Rack body
-    sse_body = Enumerator.new do |yielder|
+    # Queue bridges the background AI thread and the SSE response
+    queue = Thread::Queue.new
+
+    # Run AI in background thread — pushes events to queue
+    ai_thread = Thread.new do
       begin
-        yielder << ": connected\n\n"
-
         service = PlannerService.new
-
         service.send_message_streaming(message) do |event|
-          case event[:type]
-          when "chunk"
-            yielder << "data: #{JSON.generate({ type: "chunk", content: event[:content] })}\n\n"
-          when "draft"
-            yielder << "data: #{JSON.generate({ type: "draft", draft: event[:draft] })}\n\n"
-          when "done"
-            yielder << "data: #{JSON.generate({ type: "done" })}\n\n"
-          when "error"
-            yielder << "data: #{JSON.generate({ type: "error", content: event[:content] })}\n\n"
-          end
+          queue.push(event)
         end
       rescue => e
-        GardenLogger.error "[Planner/SSE] Stream error: #{e.class}: #{e.message}"
-        yielder << "data: #{JSON.generate({ type: "error", content: e.message })}\n\n"
+        GardenLogger.error "[Planner/SSE] AI thread error: #{e.class}: #{e.message}"
+        queue.push({ type: "error", content: e.message })
       end
+      queue.push(:done)
+    end
+
+    # SSE body reads from queue, sends keepalives while waiting
+    sse_body = Enumerator.new do |yielder|
+      yielder << ": connected\n\n"
+
+      loop do
+        # Non-blocking poll with 2s timeout — yields keepalive if nothing ready
+        event = nil
+        begin
+          event = queue.pop(timeout: 2)
+        rescue ThreadError
+          # Ruby < 3.2 doesn't support timeout — use non_block
+          event = queue.pop(true) rescue nil
+        end
+
+        if event.nil?
+          # Nothing from AI yet — send keepalive to prevent Puma timeout
+          yielder << ": keepalive\n\n"
+          next
+        end
+
+        break if event == :done
+
+        case event[:type]
+        when "chunk"
+          yielder << "data: #{JSON.generate({ type: "chunk", content: event[:content] })}\n\n"
+        when "draft"
+          yielder << "data: #{JSON.generate({ type: "draft", draft: event[:draft] })}\n\n"
+        when "error"
+          yielder << "data: #{JSON.generate({ type: "error", content: event[:content] })}\n\n"
+          break
+        end
+      end
+
+      yielder << "data: #{JSON.generate({ type: "done" })}\n\n"
+      ai_thread.join(5) # clean up
     end
 
     [200, {
