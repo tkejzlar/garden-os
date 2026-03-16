@@ -497,12 +497,17 @@ function gardenDesigner(bedsData) {
     },
 
     // ── Computed helpers ─────────────────────────────────────────────────────
+    _isPlaced(b) {
+      return (b.canvas_x !== null && b.canvas_x !== undefined) ||
+             (b.canvas_points && b.canvas_points.length > 0);
+    },
+
     get placedBeds() {
-      return this.beds.filter(b => b.canvas_x !== null && b.canvas_x !== undefined);
+      return this.beds.filter(b => this._isPlaced(b));
     },
 
     get unplacedBeds() {
-      return this.beds.filter(b => b.canvas_x === null || b.canvas_x === undefined);
+      return this.beds.filter(b => !this._isPlaced(b));
     },
 
     bedFill(bed) {
@@ -709,6 +714,10 @@ function gardenDesigner(bedsData) {
       .then(r => r.json())
       .then(newBed => {
         newBed.rows = [];
+        // Server returns canvas_points as JSON string — parse it back to array
+        if (typeof newBed.canvas_points === 'string') {
+          try { newBed.canvas_points = JSON.parse(newBed.canvas_points); } catch(e) { newBed.canvas_points = []; }
+        }
         this.beds.push(newBed);
         this.selectedBed = newBed;
       })
