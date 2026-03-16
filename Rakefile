@@ -20,3 +20,37 @@ namespace :db do
     puts "Seed data loaded."
   end
 end
+
+namespace :catalog do
+  desc "Scrape all seed suppliers"
+  task :scrape do
+    require_relative "config/database"
+    require_relative "models/seed_catalog_entry"
+    require_relative "services/catalog_scraper"
+
+    Sequel::Migrator.run(DB, "db/migrations")
+    CatalogScraper.scrape_all!
+  end
+
+  desc "Scrape a single supplier (e.g. rake catalog:scrape_one[reinsaat])"
+  task :scrape_one, [:supplier] do |t, args|
+    require_relative "config/database"
+    require_relative "models/seed_catalog_entry"
+    require_relative "services/catalog_scraper"
+
+    Sequel::Migrator.run(DB, "db/migrations")
+    CatalogScraper.scrape_supplier!(args[:supplier])
+  end
+
+  desc "Show catalog stats"
+  task :stats do
+    require_relative "config/database"
+    require_relative "models/seed_catalog_entry"
+
+    Sequel::Migrator.run(DB, "db/migrations")
+    total = SeedCatalogEntry.count
+    by_supplier = SeedCatalogEntry.group_and_count(:supplier).all
+    puts "Seed catalog: #{total} varieties"
+    by_supplier.each { |r| puts "  #{r[:supplier]}: #{r[:count]}" }
+  end
+end
