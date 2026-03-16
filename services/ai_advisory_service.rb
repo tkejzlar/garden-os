@@ -14,6 +14,14 @@ class AIAdvisoryService
     ENV.fetch("GARDEN_AI_MODEL", DEFAULT_MODEL)
   end
 
+  def self.provider
+    m = model_id
+    if m.start_with?("claude") then :anthropic
+    elsif m.start_with?("gemini") then :gemini
+    else :openai
+    end
+  end
+
   def self.system_prompt
     <<~PROMPT
       You are a garden advisor for a productive vegetable garden in Prague, Czech Republic (zone 6b/7a).
@@ -82,7 +90,7 @@ class AIAdvisoryService
   def self.run_daily!
     context = build_context
 
-    chat = RubyLLM.chat(model: model_id, assume_model_exists: true)
+    chat = RubyLLM.chat(model: model_id, provider: provider, assume_model_exists: true)
       .with_instructions(system_prompt)
       .with_temperature(0.3)
 

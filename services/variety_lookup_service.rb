@@ -6,6 +6,14 @@ class VarietyLookupService
     ENV.fetch("GARDEN_AI_MODEL", "gpt-4o")
   end
 
+  def self.provider
+    m = model_id
+    if m.start_with?("claude") then :anthropic
+    elsif m.start_with?("gemini") then :gemini
+    else :openai
+    end
+  end
+
   def self.system_prompt
     <<~PROMPT
       You are a garden variety identification expert. Given a plant variety name,
@@ -35,7 +43,7 @@ class VarietyLookupService
   def self.lookup(variety_name)
     return nil if variety_name.nil? || variety_name.strip.empty?
 
-    chat = RubyLLM.chat(model: model_id, assume_model_exists: true)
+    chat = RubyLLM.chat(model: model_id, provider: provider, assume_model_exists: true)
       .with_instructions(system_prompt)
       .with_temperature(0.2)
 
