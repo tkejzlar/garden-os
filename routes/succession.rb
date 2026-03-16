@@ -192,7 +192,7 @@ class GardenApp
     })
   end
 
-  # SSE streaming endpoint
+  # SSE streaming endpoint — uses Rack hijack for Falcon compatibility
   get "/succession/planner/stream" do
     message = params[:message].to_s.strip
     halt 400, "message required" if message.empty?
@@ -200,44 +200,36 @@ class GardenApp
     require_relative "../services/planner_service"
     require_relative "../services/garden_logger"
 
-    content_type "text/event-stream"
-    headers "Cache-Control" => "no-cache", "Connection" => "keep-alive", "X-Accel-Buffering" => "no"
-
-    stream do |out|
+    # Build SSE response as a streaming Rack body
+    sse_body = Enumerator.new do |yielder|
       begin
-        # Send initial keepalive so the connection is established
-        out << ": connected\n\n"
+        yielder << ": connected\n\n"
 
         service = PlannerService.new
-
-        # Start a keepalive thread that sends SSE comments every 3s while tools execute
-        keepalive = Thread.new do
-          loop do
-            sleep 3
-            out << ": keepalive\n\n" rescue break
-          end
-        end
 
         service.send_message_streaming(message) do |event|
           case event[:type]
           when "chunk"
-            out << "data: #{JSON.generate({ type: "chunk", content: event[:content] })}\n\n"
+            yielder << "data: #{JSON.generate({ type: "chunk", content: event[:content] })}\n\n"
           when "draft"
-            out << "data: #{JSON.generate({ type: "draft", draft: event[:draft] })}\n\n"
+            yielder << "data: #{JSON.generate({ type: "draft", draft: event[:draft] })}\n\n"
           when "done"
-            out << "data: #{JSON.generate({ type: "done" })}\n\n"
+            yielder << "data: #{JSON.generate({ type: "done" })}\n\n"
           when "error"
-            out << "data: #{JSON.generate({ type: "error", content: event[:content] })}\n\n"
+            yielder << "data: #{JSON.generate({ type: "error", content: event[:content] })}\n\n"
           end
         end
-
-        keepalive.kill
       rescue => e
-        keepalive&.kill
         GardenLogger.error "[Planner/SSE] Stream error: #{e.class}: #{e.message}"
-        out << "data: #{JSON.generate({ type: "error", content: e.message })}\n\n" rescue nil
+        yielder << "data: #{JSON.generate({ type: "error", content: e.message })}\n\n"
       end
     end
+
+    [200, {
+      "Content-Type" => "text/event-stream",
+      "Cache-Control" => "no-cache",
+      "X-Accel-Buffering" => "no"
+    }, sse_body]
   end
 
   post "/succession/planner/commit" do
