@@ -249,6 +249,15 @@
           </template>
           <a :href="'/beds/' + selectedBed.id" class="inline-block mt-2 text-xs" style="color: var(--green-900);">Edit rows & slots →</a>
         </div>
+
+        <!-- Delete -->
+        <div class="pt-3 mt-3" style="border-top: 1px solid #e5e7eb;">
+          <button
+            @click="deleteBed(selectedBed)"
+            class="text-xs px-3 py-1.5 rounded-lg"
+            style="background: #fef2f2; color: #991b1b;"
+          >Delete bed</button>
+        </div>
       </div>
     </template>
   </div>
@@ -618,8 +627,15 @@ function gardenDesigner(bedsData) {
         const [mx, my] = this.svgPoint(e);
         const dx = mx - this.dragging.startMouseX;
         const dy = my - this.dragging.startMouseY;
-        this.dragging.bed.canvas_x = this.snap(this.dragging.startBedX + dx);
-        this.dragging.bed.canvas_y = this.snap(this.dragging.startBedY + dy);
+        if (this.dragging.isPolygon) {
+          // Move all polygon points by the delta
+          this.dragging.bed.canvas_points = this.dragging.startPoints.map(p =>
+            [this.snap(p[0] + dx), this.snap(p[1] + dy)]
+          );
+        } else {
+          this.dragging.bed.canvas_x = this.snap(this.dragging.startBedX + dx);
+          this.dragging.bed.canvas_y = this.snap(this.dragging.startBedY + dy);
+        }
       } else if (this.resizing) {
         const [mx, my] = this.svgPoint(e);
         const dw = mx - this.resizing.startMouseX;
@@ -669,10 +685,13 @@ function gardenDesigner(bedsData) {
       if (this.activeTool !== 'select') return;
       this.selectedBed = bed;
       const [mx, my] = this.svgPoint(e);
+      const isPolygon = bed.canvas_points && bed.canvas_points.length > 0;
       this.dragging = {
         bed,
         startMouseX: mx, startMouseY: my,
-        startBedX: bed.canvas_x, startBedY: bed.canvas_y
+        startBedX: bed.canvas_x, startBedY: bed.canvas_y,
+        isPolygon,
+        startPoints: isPolygon ? bed.canvas_points.map(p => [...p]) : null
       };
     },
 
@@ -743,6 +762,16 @@ function gardenDesigner(bedsData) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       }).catch(err => console.error('Failed to save position:', err));
+    },
+
+    deleteBed(bed) {
+      if (!confirm(`Delete "${bed.name}"? This cannot be undone.`)) return;
+      fetch(`/api/beds/${bed.id}`, { method: 'DELETE' })
+        .then(() => {
+          this.beds = this.beds.filter(b => b.id !== bed.id);
+          this.selectedBed = null;
+        })
+        .catch(err => console.error('Failed to delete bed:', err));
     },
 
     patchBedProperty(bed, key, value) {

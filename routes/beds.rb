@@ -167,4 +167,14 @@ class GardenApp
     json bed.reload.values
   end
 
+  # ── API: delete bed ──────────────────────────────────────────────────────────
+  delete "/api/beds/:id" do
+    bed = Bed[params[:id].to_i]
+    halt 404, json(error: "Bed not found") unless bed
+
+    # Cascade: delete rows → slots (DB handles via ON DELETE CASCADE)
+    bed.destroy
+    json(success: true)
+  end
+
 end
