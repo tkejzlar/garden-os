@@ -7,12 +7,19 @@ class TestSuccession < GardenTest
     assert_equal 200, last_response.status
   end
 
-  def test_succession_shows_plan
+  def test_succession_page_includes_alpine_component
+    get "/succession"
+    assert_includes last_response.body, "x-data=\"gantt()\""
+  end
+
+  def test_succession_api_still_works
     SuccessionPlan.create(crop: "Lettuce", varieties: '["Tre Colori"]',
                           interval_days: 18, total_planned_sowings: 8,
                           season_start: Date.today, season_end: Date.today + 90,
                           target_beds: '["BB1"]')
-    get "/succession"
-    assert_includes last_response.body, "Lettuce"
+    get "/api/succession"
+    assert_equal 200, last_response.status
+    body = JSON.parse(last_response.body)
+    assert_equal "Lettuce", body.first["crop"]
   end
 end

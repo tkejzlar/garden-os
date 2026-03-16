@@ -1,95 +1,451 @@
-<!-- Page Header -->
-<div class="mb-6">
-  <h1 class="text-2xl font-bold" style="color: var(--text-primary); letter-spacing: -0.5px;">
-    Succession Planner
-  </h1>
+<%# views/succession.erb — Succession Gantt %>
+
+<div
+  x-data="gantt()"
+  x-init="init()"
+  class="mb-6"
+>
+
+  <!-- ── Page header ── -->
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold" style="color: var(--text-primary); letter-spacing: -0.5px;">
+      Plan
+    </h1>
+    <!-- Zoom toggle -->
+    <div class="flex gap-2">
+      <button
+        @click="setZoom('week')"
+        :class="zoom === 'week' ? 'font-semibold' : 'opacity-50'"
+        class="text-sm px-3 py-1 rounded-full border transition"
+        style="border-color: var(--green-900); color: var(--green-900);"
+      >Week</button>
+      <button
+        @click="setZoom('month')"
+        :class="zoom === 'month' ? 'font-semibold' : 'opacity-50'"
+        class="text-sm px-3 py-1 rounded-full border transition"
+        style="border-color: var(--green-900); color: var(--green-900);"
+      >Month</button>
+    </div>
+  </div>
+
+  <!-- ── Loading / empty states ── -->
+  <template x-if="loading">
+    <p class="text-center py-12" style="color: var(--text-secondary);">Loading…</p>
+  </template>
+
+  <template x-if="!loading && plans.length === 0">
+    <div class="text-center py-12" style="color: var(--text-secondary);">
+      <p class="text-base">No succession plans set up. Create one to see the timeline.</p>
+    </div>
+  </template>
+
+  <!-- ── Gantt chart ── -->
+  <template x-if="!loading && plans.length > 0">
+    <div>
+
+      <!-- Outer scroll wrapper -->
+      <div
+        id="gantt-scroll"
+        class="overflow-x-auto rounded-xl"
+        style="background: white; box-shadow: var(--card-shadow);"
+      >
+        <!-- Inner: fixed left label column + scrolling timeline -->
+        <div class="flex" style="min-width: max-content;">
+
+          <!-- Left label column (sticky) -->
+          <div
+            class="flex-shrink-0 sticky left-0 z-20"
+            style="width: 120px; background: white; border-right: 1px solid #e5e7eb;"
+          >
+            <!-- Corner spacer (aligns with header row) -->
+            <div style="height: 40px; border-bottom: 1px solid #e5e7eb;"></div>
+            <!-- One label per plan row -->
+            <template x-for="plan in plans" :key="plan.plan_id">
+              <div
+                class="flex items-center px-3 text-sm font-medium truncate"
+                style="height: 48px; color: var(--text-primary); border-bottom: 1px solid #f3f4f6;"
+                :title="plan.crop"
+                x-text="plan.crop"
+              ></div>
+            </template>
+          </div>
+
+          <!-- Timeline area -->
+          <div class="flex-1 relative" :style="`width: ${timelineWidth}px`">
+
+            <!-- Week/month header -->
+            <div
+              class="flex sticky top-0 z-10"
+              style="height: 40px; border-bottom: 1px solid #e5e7eb; background: #f9faf8;"
+            >
+              <template x-for="seg in headerSegments" :key="seg.label + seg.left">
+                <div
+                  class="absolute flex items-center pl-2 text-xs font-semibold overflow-hidden whitespace-nowrap"
+                  style="height: 40px; color: var(--text-secondary); border-right: 1px solid #e5e7eb;"
+                  :style="`left: ${seg.left}px; width: ${seg.width}px;`"
+                  x-text="seg.label"
+                ></div>
+              </template>
+            </div>
+
+            <!-- Today marker -->
+            <div
+              class="absolute top-0 bottom-0 z-30 pointer-events-none"
+              style="width: 2px; background: #dc2626;"
+              :style="`left: ${todayLeft}px;`"
+            >
+              <div
+                class="absolute top-10 text-xs font-bold px-1 rounded"
+                style="background: #dc2626; color: white; transform: translateX(-50%); white-space: nowrap;"
+              >Today</div>
+            </div>
+
+            <!-- Plan rows -->
+            <template x-for="(plan, rowIdx) in plans" :key="plan.plan_id">
+              <div
+                class="relative"
+                style="height: 48px; border-bottom: 1px solid #f3f4f6;"
+                :style="`width: ${timelineWidth}px;`"
+              >
+                <!-- Grid day lines (subtle) -->
+                <template x-for="seg in headerSegments" :key="'line-' + seg.left">
+                  <div
+                    class="absolute top-0 bottom-0 pointer-events-none"
+                    style="width: 1px; background: #f3f4f6;"
+                    :style="`left: ${seg.left}px;`"
+                  ></div>
+                </template>
+
+                <!-- Bars -->
+                <template x-for="bar in plan.bars" :key="bar.task_id">
+                  <div
+                    class="absolute flex items-center justify-center rounded cursor-pointer select-none text-xs font-semibold text-white transition-shadow hover:shadow-md"
+                    :style="barStyle(bar)"
+                    :title="bar.label + ' — ' + bar.due_date"
+                    @mousedown="startDrag($event, bar)"
+                    @touchstart.prevent="startDrag($event, bar)"
+                    @click.stop="openPopover(bar, plan)"
+                  >
+                    <span
+                      class="truncate px-1"
+                      x-text="bar.label"
+                      style="pointer-events: none;"
+                    ></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+          </div><!-- /timeline area -->
+        </div><!-- /flex row -->
+      </div><!-- /scroll wrapper -->
+
+    </div>
+  </template>
+
+  <!-- ── Popover ── -->
+  <template x-if="popover.open">
+    <div
+      class="fixed inset-0 z-50 flex items-end justify-center pb-8 px-4"
+      style="background: rgba(0,0,0,0.4);"
+      @click.self="closePopover()"
+    >
+      <div
+        class="w-full max-w-sm rounded-2xl p-5 shadow-xl"
+        style="background: white;"
+        @click.stop
+      >
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-bold" style="color: var(--text-primary);" x-text="popover.plan.crop + ' — ' + popover.bar.label"></h2>
+          <button @click="closePopover()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+        </div>
+
+        <dl class="text-sm space-y-1 mb-4" style="color: var(--text-secondary);">
+          <div>
+            <dt class="inline font-medium" style="color: var(--text-primary);">Due: </dt>
+            <dd class="inline" x-text="popover.bar.due_date || '—'"></dd>
+          </div>
+          <div>
+            <dt class="inline font-medium" style="color: var(--text-primary);">Status: </dt>
+            <dd class="inline capitalize" x-text="popover.bar.status"></dd>
+          </div>
+          <div x-show="popover.plan.varieties.length > 0">
+            <dt class="inline font-medium" style="color: var(--text-primary);">Varieties: </dt>
+            <dd class="inline" x-text="popover.plan.varieties.join(', ')"></dd>
+          </div>
+          <div x-show="popover.plan.target_beds.length > 0">
+            <dt class="inline font-medium" style="color: var(--text-primary);">Beds: </dt>
+            <dd class="inline" x-text="popover.plan.target_beds.join(', ')"></dd>
+          </div>
+          <div x-show="popover.plan.interval_days">
+            <dt class="inline font-medium" style="color: var(--text-primary);">Interval: </dt>
+            <dd class="inline" x-text="'every ' + popover.plan.interval_days + ' days'"></dd>
+          </div>
+        </dl>
+
+        <template x-if="popover.bar.status !== 'done'">
+          <button
+            @click="markDone(popover.bar)"
+            :disabled="popover.saving"
+            class="w-full py-2 rounded-xl text-sm font-semibold text-white transition"
+            style="background: #16a34a;"
+            :style="popover.saving ? 'opacity: 0.6; cursor: not-allowed;' : ''"
+          >
+            <span x-text="popover.saving ? 'Saving…' : 'Mark done'"></span>
+          </button>
+        </template>
+        <template x-if="popover.bar.status === 'done'">
+          <p class="text-center text-sm font-semibold" style="color: #16a34a;">Completed</p>
+        </template>
+      </div>
+    </div>
+  </template>
+
+  <!-- Drag ghost layer (catches move/up events anywhere on page) -->
+  <template x-if="drag.active">
+    <div
+      class="fixed inset-0 z-40 cursor-grabbing"
+      style="background: transparent;"
+      @mousemove.window="onDragMove($event)"
+      @mouseup.window="endDrag($event)"
+      @touchmove.window.prevent="onDragMove($event)"
+      @touchend.window="endDrag($event)"
+    ></div>
+  </template>
+
 </div>
 
-<% if @plans.empty? %>
-  <div class="text-center py-12" style="color: var(--text-secondary);">
-    <p class="text-base">No succession plans set up yet.</p>
-  </div>
-<% else %>
-  <div class="space-y-4">
-    <% @plans.each do |plan| %>
-      <%
-        completed = Task.where(task_type: "sow")
-                       .where(Sequel.like(:title, "%#{plan.crop}%"))
-                       .where(status: "done").count
-        total = plan.total_planned_sowings || 0
-        pct = total > 0 ? (completed.to_f / total * 100).round : 0
-        next_date = plan.next_sowing_date(completed)
-      %>
-      <div style="background: white; border-radius: var(--card-radius); padding: 16px; box-shadow: var(--card-shadow);">
+<script>
+function gantt() {
+  return {
+    // ── State ──────────────────────────────────────────────────────────
+    loading: true,
+    plans: [],
+    today: null,
 
-        <!-- Header row: crop name + count -->
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-lg font-semibold" style="color: var(--text-primary);">
-            <%= plan.crop %>
-          </h2>
-          <span class="text-sm font-medium" style="color: var(--text-secondary);">
-            <%= completed %>/<%= total %>
-          </span>
-        </div>
+    zoom: 'week',      // 'week' | 'month'
+    dayPx: 28,         // pixels per day (week view default)
+    windowDays: 120,   // total days shown
 
-        <!-- Progress Bar -->
-        <div class="rounded-full mb-3" style="background: #e5e7eb; height: 6px; overflow: hidden;">
-          <div class="h-full rounded-full transition-all"
-               style="width: <%= pct %>%; background: #16a34a;"></div>
-        </div>
+    // Timeline window: starts 14 days before today
+    startDate: null,
 
-        <!-- Numbered Sowing Dots -->
-        <div class="flex flex-wrap gap-2 mb-4">
-          <% total.times do |i| %>
-            <% if i < completed %>
-              <!-- Completed: green -->
-              <div class="flex items-center justify-center rounded-full text-xs font-bold text-white"
-                   style="width: 24px; height: 24px; background: #16a34a;">
-                <%= i + 1 %>
-              </div>
-            <% elsif i == completed %>
-              <!-- Current/next: amber -->
-              <div class="flex items-center justify-center rounded-full text-xs font-bold"
-                   style="width: 24px; height: 24px; background: var(--alert-amber-bg); border: 2px solid var(--alert-amber-border); color: #92400e;">
-                <%= i + 1 %>
-              </div>
-            <% else %>
-              <!-- Future: gray -->
-              <div class="flex items-center justify-center rounded-full text-xs"
-                   style="width: 24px; height: 24px; background: #f3f4f6; color: var(--gray-400);">
-                <%= i + 1 %>
-              </div>
-            <% end %>
-          <% end %>
-        </div>
+    drag: {
+      active: false,
+      bar: null,
+      originX: 0,         // pageX at mousedown
+      originalLeft: 0,    // bar's left px at drag start
+      currentLeft: 0      // live left px during drag
+    },
 
-        <!-- Details -->
-        <div class="text-sm space-y-1" style="color: var(--text-secondary);">
-          <p>
-            Every <strong style="color: var(--text-primary);"><%= plan.interval_days %></strong> days
-            &mdash;
-            <span style="color: var(--text-primary);"><%= plan.varieties_list.join(", ") %></span>
-          </p>
-          <% unless plan.target_beds_list.empty? %>
-            <p>Beds: <%= plan.target_beds_list.join(", ") %></p>
-          <% end %>
+    popover: {
+      open: false,
+      bar: null,
+      plan: null,
+      saving: false
+    },
 
-          <!-- Next sowing countdown -->
-          <% if next_date && next_date >= Date.today %>
-            <% days_until = (next_date - Date.today).to_i %>
-            <p class="font-semibold mt-2" style="color: #92400e;">
-              Next sowing (#<%= completed + 1 %>) in
-              <strong><%= days_until %></strong> days
-              (<%= next_date.strftime("%b %-d") %>)
-            </p>
-          <% elsif completed >= total %>
-            <p class="font-semibold mt-2" style="color: #16a34a;">
-              All sowings complete!
-            </p>
-          <% end %>
-        </div>
+    // ── Init ───────────────────────────────────────────────────────────
+    async init() {
+      this.loading = true
+      try {
+        const res = await fetch('/api/succession/gantt')
+        const data = await res.json()
+        this.today = new Date(data.today + 'T00:00:00')
+        this.startDate = new Date(this.today)
+        this.startDate.setDate(this.startDate.getDate() - 14)
+        this.plans = data.plans
+      } catch (e) {
+        console.error('Gantt load failed', e)
+      } finally {
+        this.loading = false
+      }
+    },
 
-      </div>
-    <% end %>
-  </div>
-<% end %>
+    // ── Zoom ───────────────────────────────────────────────────────────
+    setZoom(z) {
+      this.zoom = z
+      this.dayPx = z === 'week' ? 28 : 12
+    },
+
+    // ── Computed geometry ──────────────────────────────────────────────
+    get timelineWidth() {
+      return this.windowDays * this.dayPx
+    },
+
+    get todayLeft() {
+      if (!this.startDate || !this.today) return 0
+      return this.daysBetween(this.startDate, this.today) * this.dayPx
+    },
+
+    get headerSegments() {
+      if (!this.startDate) return []
+      const segs = []
+      const d = new Date(this.startDate)
+      const segDays = this.zoom === 'week' ? 7 : 30
+
+      while (this.daysBetween(this.startDate, d) < this.windowDays) {
+        const left = this.daysBetween(this.startDate, d) * this.dayPx
+        const label = this.zoom === 'week'
+          ? this.fmtDate(d, 'MMM d')
+          : this.fmtDate(d, 'MMM yyyy')
+        segs.push({ left, width: segDays * this.dayPx, label })
+        d.setDate(d.getDate() + segDays)
+      }
+      return segs
+    },
+
+    // ── Bar style ──────────────────────────────────────────────────────
+    barStyle(bar) {
+      if (!bar.due_date || !this.startDate) return 'display: none'
+
+      const barDate = new Date(bar.due_date + 'T00:00:00')
+      const left = this.drag.active && this.drag.bar && this.drag.bar.task_id === bar.task_id
+        ? this.drag.currentLeft
+        : this.daysBetween(this.startDate, barDate) * this.dayPx
+
+      const width = Math.max(this.dayPx * 2, 52)  // at least 2-day width for readability
+
+      const bg = bar.color === 'green'  ? '#16a34a'
+               : bar.color === 'amber'  ? '#d97706'
+               :                          '#9ca3af'
+
+      const top = 8
+      const height = 32
+
+      return [
+        `left: ${left}px`,
+        `width: ${width}px`,
+        `top: ${top}px`,
+        `height: ${height}px`,
+        `background: ${bg}`,
+        `border-radius: 6px`,
+        `cursor: ${this.drag.active ? 'grabbing' : 'grab'}`,
+        `user-select: none`,
+        `transition: ${this.drag.active ? 'none' : 'left 0.15s ease'}`
+      ].join('; ')
+    },
+
+    // ── Drag ───────────────────────────────────────────────────────────
+    startDrag(event, bar) {
+      const e = event.touches ? event.touches[0] : event
+      const barDate = bar.due_date ? new Date(bar.due_date + 'T00:00:00') : null
+      if (!barDate) return
+
+      const originalLeft = this.daysBetween(this.startDate, barDate) * this.dayPx
+
+      this.drag = {
+        active: true,
+        bar,
+        originX: e.pageX,
+        originalLeft,
+        currentLeft: originalLeft
+      }
+      // prevent click from firing as a popover-open if we actually drag
+      this._wasDragged = false
+    },
+
+    onDragMove(event) {
+      if (!this.drag.active) return
+      const e = event.touches ? event.touches[0] : event
+      const delta = e.pageX - this.drag.originX
+      this.drag.currentLeft = Math.max(0, this.drag.originalLeft + delta)
+      if (Math.abs(delta) > 4) this._wasDragged = true
+    },
+
+    async endDrag(event) {
+      if (!this.drag.active) return
+      const bar = this.drag.bar
+      const finalLeft = this.drag.currentLeft
+      this.drag.active = false
+
+      if (!this._wasDragged) return  // was a click, not a drag
+
+      // Calculate new date from pixel offset
+      const daysOffset = Math.round(finalLeft / this.dayPx)
+      const newDate = new Date(this.startDate)
+      newDate.setDate(newDate.getDate() + daysOffset)
+      const newDateStr = this.toISODate(newDate)
+
+      // Optimistic update
+      const originalDate = bar.due_date
+      bar.due_date = newDateStr
+
+      try {
+        const res = await fetch(`/tasks/${bar.task_id}/reschedule`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `due_date=${encodeURIComponent(newDateStr)}`
+        })
+        if (!res.ok) {
+          bar.due_date = originalDate  // rollback
+          console.error('Reschedule failed', res.status)
+        } else {
+          // Recalculate color
+          const daysUntil = this.daysBetween(this.today, newDate)
+          bar.days_until = daysUntil
+          bar.color = daysUntil <= 0 && bar.status === 'done' ? 'green'
+                    : bar.status === 'done'                   ? 'green'
+                    : daysUntil <= 7                          ? 'amber'
+                    :                                           'gray'
+        }
+      } catch (e) {
+        bar.due_date = originalDate
+        console.error('Reschedule error', e)
+      }
+    },
+
+    // ── Popover ────────────────────────────────────────────────────────
+    openPopover(bar, plan) {
+      if (this._wasDragged) return  // suppress if we just dragged
+      this.popover = { open: true, bar, plan, saving: false }
+    },
+
+    closePopover() {
+      this.popover = { open: false, bar: null, plan: null, saving: false }
+    },
+
+    async markDone(bar) {
+      this.popover.saving = true
+      try {
+        const res = await fetch(`/tasks/${bar.task_id}/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: ''
+        })
+        if (res.ok || res.status === 302) {
+          bar.status = 'done'
+          bar.color = 'green'
+          this.popover.bar = { ...bar }  // force reactivity
+        }
+      } catch (e) {
+        console.error('Mark done error', e)
+      } finally {
+        this.popover.saving = false
+      }
+    },
+
+    // ── Helpers ────────────────────────────────────────────────────────
+    daysBetween(a, b) {
+      const msPerDay = 86400000
+      const aUTC = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())
+      const bUTC = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())
+      return Math.round((bUTC - aUTC) / msPerDay)
+    },
+
+    toISODate(d) {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    },
+
+    fmtDate(d, fmt) {
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+      if (fmt === 'MMM d')    return `${months[d.getMonth()]} ${d.getDate()}`
+      if (fmt === 'MMM yyyy') return `${months[d.getMonth()]} ${d.getFullYear()}`
+      return d.toDateString()
+    }
+  }
+}
+</script>
