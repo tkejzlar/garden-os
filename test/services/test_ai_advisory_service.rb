@@ -40,4 +40,19 @@ class TestAIAdvisoryService < GardenTest
   ensure
     ENV.delete("GARDEN_AI_MODEL")
   end
+
+  def test_build_context_includes_harvest_counts
+    plant = Plant.create(variety_name: "Marmande", crop_type: "tomato", lifecycle_stage: "producing")
+    Harvest.create(plant_id: plant.id, date: Date.today, quantity: "large")
+    Harvest.create(plant_id: plant.id, date: Date.today, quantity: "large")
+    Harvest.create(plant_id: plant.id, date: Date.today, quantity: "small")
+
+    context = AIAdvisoryService.build_context
+    plant_ctx = context[:plants].find { |p| p[:variety_name] == "Marmande" }
+
+    refute_nil plant_ctx
+    assert_equal 3,              plant_ctx[:total_harvests]
+    assert_equal 2,              plant_ctx[:harvest_counts]["large"]
+    assert_equal 1,              plant_ctx[:harvest_counts]["small"]
+  end
 end

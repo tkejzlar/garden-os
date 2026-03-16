@@ -2,6 +2,7 @@
 require "json"
 require_relative "../config/ruby_llm"
 require_relative "../models/plant"
+require_relative "../models/harvest"
 require_relative "../models/task"
 require_relative "../models/advisory"
 require_relative "../db/seeds/seed_varieties"
@@ -36,12 +37,18 @@ class AIAdvisoryService
 
   def self.build_context
     plants = Plant.exclude(lifecycle_stage: "done").all.map do |p|
+      harvest_rows = Harvest.where(plant_id: p.id).all
+      harvest_counts = harvest_rows.group_by(&:quantity).transform_values(&:count)
+      total_harvests = harvest_rows.count
+
       {
-        variety_name: p.variety_name,
-        crop_type: p.crop_type,
-        stage: p.lifecycle_stage,
-        days_in_stage: p.days_in_stage,
-        sow_date: p.sow_date&.to_s
+        variety_name:   p.variety_name,
+        crop_type:      p.crop_type,
+        stage:          p.lifecycle_stage,
+        days_in_stage:  p.days_in_stage,
+        sow_date:       p.sow_date&.to_s,
+        total_harvests: total_harvests,
+        harvest_counts: harvest_counts   # e.g. {"small"=>2, "large"=>1}
       }
     end
 
@@ -53,11 +60,11 @@ class AIAdvisoryService
     weather = WeatherService.fetch_current rescue nil
 
     {
-      date: Date.today.to_s,
-      plants: plants,
+      date:           Date.today.to_s,
+      plants:         plants,
       upcoming_tasks: tasks,
-      weather: weather,
-      variety_data: Varieties.all
+      weather:        weather,
+      variety_data:   Varieties.all
     }
   end
 
