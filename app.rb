@@ -21,3 +21,14 @@ require_relative "routes/plants"
 require_relative "routes/beds"
 require_relative "routes/tasks"
 require_relative "routes/succession"
+
+# JSON API endpoint combining all data for HACS
+class GardenApp
+  get "/api/status" do
+    json(
+      plants: Plant.exclude(lifecycle_stage: "done").count,
+      tasks_today: Task.where(due_date: Date.today).exclude(status: "done").count,
+      germinating: Plant.where(lifecycle_stage: "germinating").count
+    )
+  end
+end
