@@ -42,39 +42,12 @@ class SeedCatalogEntry < Sequel::Model
     doc = CatalogScraper.fetch_page(supplier_url)
     return self unless doc
 
-    # Extract text content — works for most supplier pages
-    # Try JSON-LD first (Reinsaat uses this)
-    json_ld = doc.css('script[type="application/ld+json"]').map { |s| JSON.parse(s.text) rescue nil }.compact
-    product = json_ld.find { |j| j["@type"] == "Product" }
+    desc = extract_description(doc)
+    art = extract_article_number(doc)
+    update(description: desc) if desc
+    update(article_number: art) if art
 
-    if product
-      update(
-        description: product["description"]&.strip,
-        article_number: product["model"] || product["sku"]
-      )
-    end
-
-    # Fallback: meta description
-    if description.nil? || description.empty?
-      meta = doc.at_css('meta[name="description"]')
-      update(description: meta["content"].strip) if meta && meta["content"] && !meta["content"].strip.empty?
-    end
-
-    # Fallback: find a paragraph that looks like a product description
-    # (contains plant-related keywords, not store hours or legal text)
-    if description.nil? || description.empty?
-      plant_keywords = /fruit|taste|variety|plant|grow|seed|sow|harvest|ripen|resistant|height|flavor|colour|color|leaf|flower/i
-      skip_keywords = /cookie|©|phone|shop.*open|monday|shipping|delivery|cart|checkout|privacy|login/i
-      doc.css("p, .product-description, [itemprop='description']").each do |el|
-        txt = el.text.strip
-        if txt.length > 40 && txt.length < 600 && txt.match?(plant_keywords) && !txt.match?(skip_keywords)
-          update(description: txt)
-          break
-        end
-      end
-    end
-
-    # Try to extract growing info from page text
+    # Extract growing info from page text
     text = doc.css("body").text
     if (m = text.match(/(\d{1,2})\s*[-–]\s*(\d{1,2})\s*°C/))
       update(germination_temp: "#{m[1]}-#{m[2]}°C")
@@ -82,9 +55,10 @@ class SeedCatalogEntry < Sequel::Model
     if (m = text.match(/(\d{2,3})\s*[x×]\s*(\d{2,3})\s*cm/))
       update(spacing: "#{m[1]}×#{m[2]}cm")
     end
-    if (m = text.match(/(\d+[.,]?\d*)\s*[-–]\s*(\d+[.,]?\d*)\s*cm.*(?:depth|deep|sowing)/i))
-      update(sowing_info: "Sowing depth: #{m[0]}")
-    end
+
+    # Look for sowing/cultivation paragraphs
+    sow_info = extract_sowing_info(doc)
+    update(sowing_info: sow_info) if sow_info
 
     reload
   rescue => e
@@ -92,16 +66,92 @@ class SeedCatalogEntry < Sequel::Model
     self
   end
 
+  private
+
+  # Strip HTML tags from a string
+  def strip_html(str)
+    str.to_s.gsub(/<[^>]+>/, " ").gsub(/\s+/, " ").strip
+  end
+
+  # Catalog boilerplate to remove
+  BOILERPLATE = /
+    in\s+variety\s+testing|seeds?\s+for\s+trial\s+cultivation|
+    thousand\s+grain\s+weight|portion\s+contents?|
+    ready\s+to\s+ship|working\s+days?|add\s+to\s+cart|
+    we\s+are\s+available|our\s+farm\s+shop
+  /ix
+
+  def clean_text(str)
+    # Strip HTML, remove boilerplate sentences, collapse whitespace
+    text = strip_html(str)
+    sentences = text.split(/(?<=[.!?])\s+/)
+    sentences.reject { |s| s.match?(BOILERPLATE) }.join(" ").strip
+  end
+
+  def extract_description(doc)
+    # 1. JSON-LD Product description
+    json_ld = doc.css('script[type="application/ld+json"]').map { |s| JSON.parse(s.text) rescue nil }.compact
+    product = json_ld.find { |j| j["@type"] == "Product" }
+    if product && product["description"]
+      cleaned = clean_text(product["description"])
+      return cleaned unless cleaned.empty? || cleaned.length < 20
+    end
+
+    # 2. Meta description
+    meta = doc.at_css('meta[name="description"]')
+    if meta && meta["content"]
+      cleaned = clean_text(meta["content"])
+      return cleaned unless cleaned.empty? || cleaned.length < 20
+    end
+
+    # 3. First meaningful paragraph with plant keywords
+    plant_keywords = /fruit|taste|variety|plant|grow|seed|sow|harvest|ripen|resistant|height|flavor|colour|color|leaf|flower|pepper|tomato|cucumber/i
+    skip_keywords = /cookie|©|phone|shop.*open|monday|shipping|delivery|cart|checkout|privacy|login|javascript/i
+    doc.css("p, .product-description, [itemprop='description'], .description").each do |el|
+      txt = el.text.strip
+      next if txt.length < 30 || txt.length > 800
+      next if txt.match?(skip_keywords)
+      next unless txt.match?(plant_keywords)
+      cleaned = clean_text(txt)
+      return cleaned unless cleaned.empty?
+    end
+
+    nil
+  end
+
+  def extract_article_number(doc)
+    json_ld = doc.css('script[type="application/ld+json"]').map { |s| JSON.parse(s.text) rescue nil }.compact
+    product = json_ld.find { |j| j["@type"] == "Product" }
+    product&.dig("model") || product&.dig("sku")
+  end
+
+  def extract_sowing_info(doc)
+    # Look for paragraphs about sowing, cultivation, planting
+    sow_keywords = /sow|pre-?cultiv|plant(?:ing|ed)|transplant|germination|cultivation|glasshouse|greenhouse|indoor|outdoor/i
+    doc.css("p, li, dd, .product-info, .growing-info").each do |el|
+      txt = el.text.strip
+      next if txt.length < 20 || txt.length > 400
+      if txt.match?(sow_keywords)
+        cleaned = clean_text(txt)
+        return cleaned unless cleaned.empty?
+      end
+    end
+    nil
+  end
+
+  public
+
   def notes_summary
-    parts = [
-      crop_subcategory,
-      description&.slice(0, 200),
-      days_to_maturity ? "#{days_to_maturity} days" : nil,
-      germination_temp ? "Germ: #{germination_temp}" : nil,
-      spacing ? "Spacing: #{spacing}" : nil,
-      frost_tender ? "Frost tender" : (frost_tender == false ? "Frost hardy" : nil),
-      sowing_info&.slice(0, 150)
-    ].compact
-    parts.join(". ")
+    parts = []
+    parts << description if description && !description.empty?
+    parts << "Germination: #{germination_temp}" if germination_temp
+    parts << "Spacing: #{spacing}" if spacing
+    # Only add sowing_info if it's different from the description
+    if sowing_info && !sowing_info.empty? && sowing_info != description
+      parts << sowing_info
+    end
+    parts << "Frost tender" if frost_tender == true
+    parts << "Frost hardy" if frost_tender == false
+    parts.join("\n")
   end
 end
