@@ -1,15 +1,19 @@
 require "ruby_llm"
 
 class DraftPlanTool < RubyLLM::Tool
-  description "Create a draft garden plan with bed assignments, succession schedules, and tasks. The user will see a visual preview and can request changes before committing. Call this when you have a complete plan ready to present."
+  description "Create a draft garden plan. The user will see a visual preview and can request changes before committing. Call this when you have a plan ready."
 
-  param :payload, type: :string, desc: "JSON string containing: summary (string), assignments (array of {bed_name, row_name, slot_position, variety_name, crop_type, source}), successions (array of {crop, varieties, interval_days, season_start, season_end, total_sowings, target_beds}), tasks (array of {title, task_type, due_date, priority, notes, related_beds})"
+  param :payload, type: :string, desc: 'JSON string: { "summary": "overview text", "assignments": [{"bed_name": "BB1", "variety_name": "Raf", "crop_type": "tomato", "source": "Reinsaat"}], "successions": [{"crop": "Lettuce", "varieties": ["Tre Colori"], "interval_days": 18, "season_start": "2026-04-01", "season_end": "2026-09-30", "total_sowings": 8, "target_beds": ["SB1"]}], "tasks": [{"title": "Sow peppers indoors", "task_type": "sow", "due_date": "2026-03-01", "priority": "must", "notes": "...", "related_beds": ["Corner"]}] }. Assignments only need bed_name + variety_name + crop_type. Rows/slots are auto-created.'
 
   def execute(payload:)
     parsed = JSON.parse(payload)
     Thread.current[:planner_draft] = parsed
-    "Draft plan stored with #{parsed['assignments']&.length || 0} bed assignments, #{parsed['successions']&.length || 0} succession schedules, and #{parsed['tasks']&.length || 0} tasks. Present the summary to the user. They will see a visual preview and can click 'Create this plan' to commit it, or ask for changes."
+
+    a = parsed["assignments"]&.length || 0
+    s = parsed["successions"]&.length || 0
+    t = parsed["tasks"]&.length || 0
+    "Draft stored: #{a} plant assignments, #{s} succession schedules, #{t} tasks. Present a summary to the user — they'll see a visual card with a 'Create this plan' button."
   rescue JSON::ParserError => e
-    "Error: Invalid JSON in payload. Please fix and try again: #{e.message}"
+    "Error: Invalid JSON. #{e.message}"
   end
 end

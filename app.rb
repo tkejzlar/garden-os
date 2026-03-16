@@ -13,6 +13,15 @@ class GardenApp < Sinatra::Base
     enable :static
   end
 
+  configure :development do
+    require "sinatra/reloader"
+    register Sinatra::Reloader
+    also_reload "routes/*.rb"
+    also_reload "models/*.rb"
+    also_reload "services/*.rb"
+    also_reload "views/**/*.erb"
+  end
+
   get "/health" do
     json status: "ok"
   end

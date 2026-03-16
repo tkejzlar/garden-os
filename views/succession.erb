@@ -35,7 +35,7 @@
           <!-- AI message -->
           <div x-show="msg.role === 'assistant'" class="flex justify-start">
             <div class="rounded-xl px-4 py-3 text-sm max-w-[85%]" style="background: white; box-shadow: var(--card-shadow);">
-              <div x-html="msg.content.replace(/\n/g, '<br>')"></div>
+              <div x-html="typeof marked !== 'undefined' ? marked.parse(msg.content || '') : msg.content" class="prose prose-sm max-w-none"></div>
               <!-- Draft card if present -->
               <template x-if="msg.draft">
                 <div class="mt-3 p-3 rounded-lg" style="background: #f0fdf4; border: 1px solid #bbf7d0;">

@@ -4,6 +4,7 @@ require_relative "../models/plant"
 require_relative "../models/task"
 require_relative "../models/succession_plan"
 require_relative "task_generator"
+require_relative "garden_logger"
 
 class PlanCommitter
   def self.commit!(draft)
@@ -18,20 +19,34 @@ class PlanCommitter
     counts = { plants: 0, succession_plans: 0, tasks: 0 }
 
     DB.transaction do
-      # Create plants from assignments
-      assignments.each do |a|
-        bed = Bed.where(name: a["bed_name"]).first
-        row = bed ? Row.where(bed_id: bed.id, name: a["row_name"]).first : nil
-        slot = row ? Slot.where(row_id: row.id, position: a["slot_position"]).first : nil
+      # Group assignments by bed for auto-slot creation
+      assignments.group_by { |a| a["bed_name"] }.each do |bed_name, bed_assignments|
+        bed = Bed.where(name: bed_name).first
+        next unless bed
 
-        Plant.create(
-          variety_name: a["variety_name"],
-          crop_type: a["crop_type"],
-          source: a["source"],
-          slot_id: slot&.id,
-          lifecycle_stage: "seed_packet"
-        )
-        counts[:plants] += 1
+        # Auto-create a row + slots if the bed doesn't have enough
+        row = Row.where(bed_id: bed.id).first
+        unless row
+          row = Row.create(bed_id: bed.id, name: "Row A", position: 1)
+          GardenLogger.info "[PlanCommitter] Auto-created Row A for bed #{bed_name}"
+        end
+
+        bed_assignments.each_with_index do |a, i|
+          # Find or create a slot
+          slot = Slot.where(row_id: row.id, position: i + 1).first
+          unless slot
+            slot = Slot.create(row_id: row.id, name: "#{i + 1}", position: i + 1)
+          end
+
+          Plant.create(
+            variety_name: a["variety_name"],
+            crop_type: a["crop_type"] || "other",
+            source: a["source"],
+            slot_id: slot.id,
+            lifecycle_stage: "seed_packet"
+          )
+          counts[:plants] += 1
+        end
       end
 
       # Create succession plans + generate tasks
@@ -69,8 +84,10 @@ class PlanCommitter
       end
     end
 
+    GardenLogger.info "[PlanCommitter] Committed: #{counts}"
     { success: true, created: counts }
   rescue => e
+    GardenLogger.error "[PlanCommitter] Error: #{e.message}"
     { success: false, errors: ["Commit failed: #{e.message}"] }
   end
 
