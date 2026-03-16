@@ -41,9 +41,12 @@
   <a href="/beds" class="text-xs" style="color: var(--gray-500);">List view →</a>
 </div>
 
+<!-- Bootstrap data for Alpine -->
+<script>window.__BEDS_DATA__ = <%= beds_json %>;</script>
+
 <!-- Alpine.js Garden Designer -->
 <div
-  x-data="gardenDesigner(<%= beds_json.gsub("</", "<\\/") %>)"
+  x-data="gardenDesigner(window.__BEDS_DATA__)"
   x-init="init()"
   @mousemove.window="onMouseMove($event)"
   @mouseup.window="onMouseUp($event)"
