@@ -19,7 +19,6 @@ class GardenApp < Sinatra::Base
     also_reload "routes/*.rb"
     also_reload "models/*.rb"
     also_reload "services/*.rb"
-    also_reload "views/**/*.erb"
   end
 
   get "/health" do
