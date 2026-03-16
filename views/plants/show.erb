@@ -1,3 +1,16 @@
+<% # Build a merged, sorted timeline of stage transitions and harvests
+   timeline = []
+   @history.each do |h|
+     timeline << { type: :stage, at: h.changed_at, entry: h }
+   end
+   @harvests.each do |h|
+     timeline << { type: :harvest, at: h.date.to_time, entry: h }
+   end
+   timeline.sort_by! { |t| t[:at] }
+%>
+
+<div x-data="{ showHarvestForm: false }">
+
 <!-- Back Link -->
 <a href="/plants" class="text-sm hover:underline mb-5 inline-block" style="color: var(--green-900);">
   &larr; All plants
@@ -78,34 +91,131 @@
   </div>
 </div>
 
-<!-- Timeline Card -->
+<!-- Log Harvest Card -->
+<div class="mb-4 px-4 py-4" style="background: white; border-radius: var(--card-radius); box-shadow: var(--card-shadow);">
+  <div class="flex items-center justify-between mb-1">
+    <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; color: var(--gray-500);">
+      Harvest
+    </p>
+    <button type="button"
+            @click="showHarvestForm = !showHarvestForm"
+            class="text-sm font-semibold px-3 py-1 rounded-full transition hover:opacity-80"
+            style="background: var(--green-900); color: white;">
+      <span x-text="showHarvestForm ? 'Cancel' : 'Log harvest'">Log harvest</span>
+    </button>
+  </div>
+
+  <% if defined?(@harvest_error) && @harvest_error %>
+    <p class="text-sm mt-2" style="color: #dc2626;">Error: <%= @harvest_error %></p>
+  <% end %>
+
+  <!-- Inline harvest form — shown/hidden by Alpine -->
+  <div x-show="showHarvestForm" x-transition class="mt-4">
+    <form method="post" action="/plants/<%= @plant.id %>/harvests">
+      <!-- Quantity buttons -->
+      <p class="text-xs font-semibold mb-2" style="color: var(--text-secondary);">How much?</p>
+      <div class="grid grid-cols-4 gap-2 mb-4">
+        <% %w[small medium large huge].each do |qty| %>
+          <label class="flex flex-col items-center cursor-pointer">
+            <input type="radio" name="quantity" value="<%= qty %>" class="sr-only" required
+                   x-data x-bind:id="'qty-<%= qty %>'">
+            <span class="w-full text-center px-2 py-2 rounded-xl text-sm font-semibold border-2 transition"
+                  style="border-color: #d1d5db; background: #f9fafb; color: var(--text-primary);"
+                  x-bind:style="$el.previousElementSibling.checked ? 'border-color: #16a34a; background: #dcfce7; color: #15803d;' : ''">
+              <%= qty.capitalize %>
+            </span>
+          </label>
+        <% end %>
+      </div>
+
+      <!-- Notes field -->
+      <div class="mb-4">
+        <label class="text-xs font-semibold block mb-1" style="color: var(--text-secondary);">
+          Notes <span style="color: var(--gray-400);">(optional)</span>
+        </label>
+        <input type="text" name="notes" placeholder="e.g. first red tomatoes from bed 2"
+               class="w-full px-3 py-2 text-sm rounded-xl border"
+               style="border-color: #d1d5db; color: var(--text-primary); background: white;">
+      </div>
+
+      <!-- Date field -->
+      <div class="mb-4">
+        <label class="text-xs font-semibold block mb-1" style="color: var(--text-secondary);">
+          Date
+        </label>
+        <input type="date" name="date" value="<%= Date.today %>"
+               class="w-full px-3 py-2 text-sm rounded-xl border"
+               style="border-color: #d1d5db; color: var(--text-primary); background: white;">
+      </div>
+
+      <button type="submit"
+              class="w-full px-4 py-3 rounded-xl font-semibold text-sm transition hover:opacity-90"
+              style="background: var(--green-900); color: white;">
+        Save harvest
+      </button>
+    </form>
+  </div>
+
+  <!-- Harvest count summary -->
+  <% unless @harvests.empty? %>
+    <p class="text-sm mt-3" style="color: var(--text-secondary);">
+      <%= @harvests.count %> harvest<%= @harvests.count == 1 ? "" : "s" %> logged
+    </p>
+  <% end %>
+</div>
+
+<!-- Timeline Card (stage transitions + harvests merged) -->
 <div class="px-4 py-4" style="background: white; border-radius: var(--card-radius); box-shadow: var(--card-shadow);">
   <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; color: var(--gray-500);" class="mb-3">
     Timeline
   </p>
-  <% if @history.empty? %>
+  <% if timeline.empty? %>
     <p class="text-sm" style="color: var(--text-secondary);">No history yet.</p>
   <% else %>
     <ol class="relative" style="border-left: 2px solid #86efac; margin-left: 8px; padding-left: 0;">
-      <% @history.each do |h| %>
+      <% timeline.each do |entry| %>
+        <% is_harvest = entry[:type] == :harvest %>
         <li class="relative pb-4 last:pb-0" style="padding-left: 20px;">
-          <!-- Circle dot -->
+          <!-- Circle dot: green for stage, amber for harvest -->
           <div class="absolute rounded-full"
-               style="width: 10px; height: 10px; background: #16a34a; border: 2px solid white; left: -6px; top: 4px; box-shadow: 0 0 0 1px #16a34a;">
+               style="width: 10px; height: 10px;
+                      background: <%= is_harvest ? '#d97706' : '#16a34a' %>;
+                      border: 2px solid white;
+                      left: -6px; top: 4px;
+                      box-shadow: 0 0 0 1px <%= is_harvest ? '#d97706' : '#16a34a' %>;">
           </div>
-          <p class="text-sm font-semibold" style="color: var(--text-primary);">
-            <%= h.to_stage.tr('_', ' ').capitalize %>
-          </p>
-          <p class="text-xs mt-0.5" style="color: var(--text-secondary);">
-            <%= h.changed_at.strftime("%b %-d, %Y %H:%M") %>
-          </p>
-          <% if h.note %>
-            <p class="text-xs mt-1" style="color: var(--text-body);">
-              <%= h.note %>
+
+          <% if is_harvest %>
+            <% h = entry[:entry] %>
+            <p class="text-sm font-semibold" style="color: var(--text-primary);">
+              Harvested &mdash; <%= h.quantity.capitalize %>
             </p>
+            <p class="text-xs mt-0.5" style="color: var(--text-secondary);">
+              <%= h.date.strftime("%b %-d, %Y") %>
+            </p>
+            <% if h.notes %>
+              <p class="text-xs mt-1" style="color: var(--text-body);">
+                <%= h.notes %>
+              </p>
+            <% end %>
+          <% else %>
+            <% h = entry[:entry] %>
+            <p class="text-sm font-semibold" style="color: var(--text-primary);">
+              <%= h.to_stage.tr('_', ' ').capitalize %>
+            </p>
+            <p class="text-xs mt-0.5" style="color: var(--text-secondary);">
+              <%= h.changed_at.strftime("%b %-d, %Y %H:%M") %>
+            </p>
+            <% if h.note %>
+              <p class="text-xs mt-1" style="color: var(--text-body);">
+                <%= h.note %>
+              </p>
+            <% end %>
           <% end %>
         </li>
       <% end %>
     </ol>
   <% end %>
 </div>
+
+</div><%# end x-data wrapper %>
