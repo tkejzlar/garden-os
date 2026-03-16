@@ -4,6 +4,8 @@ require_relative "../models/task"
 class GardenApp
   get "/succession" do
     @plans = SuccessionPlan.all
+    require_relative "../models/planner_message"
+    @planner_messages = PlannerMessage.order(:created_at).all
     erb :succession
   end
 
@@ -163,5 +165,50 @@ class GardenApp
 
     task.update(due_date: parsed, updated_at: Time.now)
     json task.values.merge(due_date: task.due_date.to_s)
+  end
+
+  # ── AI Planner Chat ──────────────────────────────────────────────────────
+
+  post "/succession/planner/message" do
+    request.body.rewind
+    body = begin
+      JSON.parse(request.body.read)
+    rescue
+      halt 400, json(error: "Invalid JSON")
+    end
+
+    message = body["message"].to_s.strip
+    halt 400, json(error: "message required") if message.empty?
+
+    require_relative "../services/planner_service"
+    service = PlannerService.new
+    result = service.send_message(message)
+
+    json({
+      content: result[:content],
+      draft: result[:draft]
+    })
+  end
+
+  post "/succession/planner/commit" do
+    request.body.rewind
+    body = begin
+      JSON.parse(request.body.read)
+    rescue
+      halt 400, json(error: "Invalid JSON")
+    end
+
+    draft = body["draft_payload"]
+    halt 400, json(error: "draft_payload required") unless draft.is_a?(Hash)
+
+    require_relative "../services/plan_committer"
+    result = PlanCommitter.commit!(draft)
+    json result
+  end
+
+  delete "/succession/planner/messages" do
+    require_relative "../models/planner_message"
+    PlannerMessage.dataset.delete
+    json(success: true)
   end
 end
