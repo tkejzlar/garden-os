@@ -73,6 +73,81 @@ class GardenApp
     json plans
   end
 
+  # ── Succession Plan CRUD ──────────────────────────────────────────────────
+
+  get "/succession/plans/new" do
+    @plan = SuccessionPlan.new
+    erb :succession_form
+  end
+
+  get "/succession/plans/:id/edit" do
+    @plan = SuccessionPlan[params[:id].to_i]
+    halt 404 unless @plan
+    erb :succession_form
+  end
+
+  post "/succession/plans" do
+    plan = SuccessionPlan.create(
+      crop:                  params[:crop].to_s.strip,
+      varieties:             params[:varieties].to_s.split(",").map(&:strip).to_json,
+      interval_days:         params[:interval_days].to_i,
+      season_start:          params[:season_start].to_s.strip.then { |v| v.empty? ? nil : Date.parse(v) },
+      season_end:            params[:season_end].to_s.strip.then { |v| v.empty? ? nil : Date.parse(v) },
+      target_beds:           params[:target_beds].to_s.split(",").map(&:strip).to_json,
+      total_planned_sowings: params[:total_planned_sowings].to_i
+    )
+    redirect "/succession"
+  end
+
+  patch "/succession/plans/:id" do
+    plan = SuccessionPlan[params[:id].to_i]
+    halt 404 unless plan
+
+    update = {}
+    update[:crop]                  = params[:crop].to_s.strip               if params[:crop]
+    update[:varieties]             = params[:varieties].to_s.split(",").map(&:strip).to_json if params[:varieties]
+    update[:interval_days]         = params[:interval_days].to_i            if params[:interval_days]
+    update[:season_start]          = Date.parse(params[:season_start])      if params[:season_start] && !params[:season_start].empty?
+    update[:season_end]            = Date.parse(params[:season_end])        if params[:season_end] && !params[:season_end].empty?
+    update[:target_beds]           = params[:target_beds].to_s.split(",").map(&:strip).to_json if params[:target_beds]
+    update[:total_planned_sowings] = params[:total_planned_sowings].to_i    if params[:total_planned_sowings]
+
+    plan.update(update)
+    redirect "/succession"
+  end
+
+  delete "/succession/plans/:id" do
+    plan = SuccessionPlan[params[:id].to_i]
+    halt 404 unless plan
+    plan.destroy
+    redirect "/succession"
+  end
+
+  # ── Generate tasks for a single plan ──────────────────────────────────────
+
+  post "/succession/plans/:id/generate" do
+    plan = SuccessionPlan[params[:id].to_i]
+    halt 404 unless plan
+
+    require_relative "../services/task_generator"
+    TaskGenerator.generate_for_plan!(plan)
+    redirect "/succession"
+  end
+
+  # ── Manual task creation ──────────────────────────────────────────────────
+
+  post "/succession/tasks" do
+    Task.create(
+      title:     params[:title].to_s.strip,
+      task_type: params[:task_type] || "sow",
+      due_date:  params[:due_date].to_s.strip.then { |v| v.empty? ? nil : Date.parse(v) },
+      priority:  params[:priority] || "should",
+      status:    "upcoming",
+      notes:     params[:notes].to_s.strip.then { |v| v.empty? ? nil : v }
+    )
+    redirect "/succession"
+  end
+
   patch "/tasks/:id/reschedule" do
     task = Task[params[:id].to_i]
     halt 404, json(error: "Task not found") unless task
