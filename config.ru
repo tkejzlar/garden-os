@@ -1,4 +1,5 @@
 # config.ru
+require "dotenv/load"
 require_relative "app"
 
 # Run migrations on startup

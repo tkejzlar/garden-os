@@ -5,12 +5,12 @@ require_relative "../models/plant"
 require_relative "weather_service"
 
 class NotificationService
-  HA_URL = ENV.fetch("HA_URL", "http://homeassistant.local:8123")
-  HA_TOKEN = ENV.fetch("HA_TOKEN", "")
-  NOTIFY_SERVICE = ENV.fetch("HA_NOTIFY_SERVICE", "notify.mobile_app_toms_phone")
+  def self.ha_url         = ENV.fetch("HA_URL", "http://homeassistant.local:8123")
+  def self.ha_token       = ENV.fetch("HA_TOKEN", "")
+  def self.notify_service = ENV.fetch("HA_NOTIFY_SERVICE", "notify.mobile_app_toms_phone")
 
   def self.send!(title:, message:, data: {})
-    return false if HA_TOKEN.empty?
+    return false if ha_token.empty?
 
     payload = {
       title: title,
@@ -20,11 +20,11 @@ class NotificationService
 
     response = HTTPX.with(
       headers: {
-        "Authorization" => "Bearer #{HA_TOKEN}",
+        "Authorization" => "Bearer #{ha_token}",
         "Content-Type" => "application/json"
       }
     ).post(
-      "#{HA_URL}/api/services/#{NOTIFY_SERVICE.sub('.', '/')}",
+      "#{ha_url}/api/services/#{notify_service.sub('.', '/')}",
       json: payload
     )
 

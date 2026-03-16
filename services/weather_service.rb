@@ -2,19 +2,19 @@ require "json"
 require "httpx"
 
 class WeatherService
-  HA_URL = ENV.fetch("HA_URL", "http://homeassistant.local:8123")
-  HA_TOKEN = ENV.fetch("HA_TOKEN", "")
-  WEATHER_ENTITY = ENV.fetch("HA_WEATHER_ENTITY", "weather.home")
+  def self.ha_url     = ENV.fetch("HA_URL", "http://homeassistant.local:8123")
+  def self.ha_token   = ENV.fetch("HA_TOKEN", "")
+  def self.weather_entity = ENV.fetch("HA_WEATHER_ENTITY", "weather.home")
 
   def self.fetch_current
-    return nil if HA_TOKEN.empty?
+    return nil if ha_token.empty?
 
     response = HTTPX.with(
       headers: {
-        "Authorization" => "Bearer #{HA_TOKEN}",
+        "Authorization" => "Bearer #{ha_token}",
         "Content-Type" => "application/json"
       }
-    ).get("#{HA_URL}/api/states/#{WEATHER_ENTITY}")
+    ).get("#{ha_url}/api/states/#{weather_entity}")
 
     return nil unless response.status == 200
     parse_forecast(JSON.parse(response.body.to_s))

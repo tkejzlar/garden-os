@@ -1,6 +1,7 @@
 # Gemfile
 source "https://rubygems.org"
 
+gem "dotenv", "~> 3.0"
 gem "sinatra", "~> 4.0"
 gem "sinatra-contrib", "~> 4.0"
 gem "puma", "~> 6.0"
