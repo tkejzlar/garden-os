@@ -1,0 +1,94 @@
+{
+  "tomato": {
+    "sow_indoor_weeks_before_last_frost": 8,
+    "germination_temp_min": 20,
+    "germination_temp_ideal": 25,
+    "germination_days_min": 5,
+    "germination_days_max": 14,
+    "days_to_maturity_min": 60,
+    "days_to_maturity_max": 90,
+    "frost_tender": true,
+    "feed_from": "first_truss"
+  },
+  "pepper": {
+    "sow_indoor_weeks_before_last_frost": 10,
+    "germination_temp_min": 25,
+    "germination_temp_ideal": 30,
+    "germination_days_min": 7,
+    "germination_days_max": 21,
+    "days_to_maturity_min": 70,
+    "days_to_maturity_max": 100,
+    "frost_tender": true
+  },
+  "cucumber": {
+    "sow_indoor_weeks_before_last_frost": 4,
+    "germination_temp_min": 20,
+    "germination_temp_ideal": 25,
+    "germination_days_min": 3,
+    "germination_days_max": 10,
+    "days_to_maturity_min": 50,
+    "days_to_maturity_max": 70,
+    "frost_tender": true
+  },
+  "lettuce": {
+    "sow_indoor_weeks_before_last_frost": 6,
+    "germination_temp_min": 10,
+    "germination_temp_ideal": 15,
+    "germination_days_min": 3,
+    "germination_days_max": 10,
+    "days_to_maturity_min": 30,
+    "days_to_maturity_max": 60,
+    "frost_tender": false
+  },
+  "radish": {
+    "direct_sow": true,
+    "germination_temp_min": 7,
+    "germination_temp_ideal": 15,
+    "germination_days_min": 3,
+    "germination_days_max": 7,
+    "days_to_maturity_min": 25,
+    "days_to_maturity_max": 35,
+    "frost_tender": false
+  },
+  "herb": {
+    "sow_indoor_weeks_before_last_frost": 8,
+    "germination_temp_min": 15,
+    "germination_temp_ideal": 20,
+    "germination_days_min": 7,
+    "germination_days_max": 21,
+    "days_to_maturity_min": 60,
+    "days_to_maturity_max": 90,
+    "frost_tender": false
+  },
+  "flower": {
+    "sow_indoor_weeks_before_last_frost": 6,
+    "germination_temp_min": 15,
+    "germination_temp_ideal": 20,
+    "germination_days_min": 5,
+    "germination_days_max": 14,
+    "days_to_maturity_min": 60,
+    "days_to_maturity_max": 90,
+    "frost_tender": false
+  },
+  "pea": {
+    "direct_sow": true,
+    "germination_temp_min": 5,
+    "germination_temp_ideal": 12,
+    "germination_days_min": 7,
+    "germination_days_max": 14,
+    "days_to_maturity_min": 60,
+    "days_to_maturity_max": 80,
+    "frost_tender": false,
+    "soil_temp_min": 5
+  },
+  "bean": {
+    "direct_sow": true,
+    "germination_temp_min": 15,
+    "germination_temp_ideal": 20,
+    "germination_days_min": 5,
+    "germination_days_max": 10,
+    "days_to_maturity_min": 50,
+    "days_to_maturity_max": 70,
+    "frost_tender": true
+  }
+}
