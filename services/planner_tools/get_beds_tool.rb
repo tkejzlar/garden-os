@@ -19,11 +19,16 @@ class GetBedsTool < RubyLLM::Tool
         { name: row.name, slots: slots }
       end
 
+      # Use real dimensions if set, otherwise derive from canvas (1 canvas unit = 1 cm)
+      length_cm = bed.length || bed.canvas_height&.round
+      width_cm  = bed.width  || bed.canvas_width&.round
+
       {
         name: bed.name,
         bed_type: bed.bed_type,
-        length: bed.length,
-        width: bed.width,
+        length_cm: length_cm,
+        width_cm: width_cm,
+        area_sqm: (length_cm && width_cm) ? (length_cm * width_cm / 10000.0).round(1) : nil,
         orientation: bed.orientation,
         rows: rows,
         total_slots: rows.sum { |r| r[:slots].length },

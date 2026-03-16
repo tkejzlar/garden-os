@@ -121,8 +121,14 @@ class GardenApp
     update = {}
     update[:canvas_x]      = body["canvas_x"].to_f      if body.key?("canvas_x")
     update[:canvas_y]      = body["canvas_y"].to_f      if body.key?("canvas_y")
-    update[:canvas_width]  = body["canvas_width"].to_f  if body.key?("canvas_width")
-    update[:canvas_height] = body["canvas_height"].to_f if body.key?("canvas_height")
+    if body.key?("canvas_width")
+      update[:canvas_width] = body["canvas_width"].to_f
+      update[:width] = body["canvas_width"].to_f.round  # sync real dimensions (cm)
+    end
+    if body.key?("canvas_height")
+      update[:canvas_height] = body["canvas_height"].to_f
+      update[:length] = body["canvas_height"].to_f.round  # sync real dimensions (cm)
+    end
     update[:canvas_color]  = body["canvas_color"]       if body.key?("canvas_color")
     if body.key?("canvas_points")
       pts = body["canvas_points"]
