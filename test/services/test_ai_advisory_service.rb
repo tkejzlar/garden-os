@@ -1,0 +1,32 @@
+require_relative "../test_helper"
+require_relative "../../services/ai_advisory_service"
+
+class TestAIAdvisoryService < GardenTest
+  def test_builds_context_payload
+    Plant.create(variety_name: "Raf", crop_type: "tomato", lifecycle_stage: "germinating",
+                 sow_date: Date.today - 5)
+
+    context = AIAdvisoryService.build_context
+    assert context.key?(:plants)
+    assert_equal 1, context[:plants].length
+    assert_equal "Raf", context[:plants][0][:variety_name]
+  end
+
+  def test_parses_advisory_response
+    mock_response = {
+      "advisories" => [
+        { "type" => "general", "summary" => "Good day for transplanting" },
+        { "type" => "plant_specific", "plant" => "Raf", "summary" => "Check moisture" }
+      ]
+    }
+
+    advisories = AIAdvisoryService.parse_response(mock_response)
+    assert_equal 2, advisories.length
+    assert_equal "general", advisories[0][:type]
+  end
+
+  def test_system_prompt_includes_prague
+    prompt = AIAdvisoryService.system_prompt
+    assert_includes prompt, "Prague"
+  end
+end
