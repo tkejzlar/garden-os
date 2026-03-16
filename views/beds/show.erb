@@ -1,0 +1,26 @@
+<a href="/beds" class="text-sm text-green-700 hover:underline mb-4 inline-block">&larr; Garden Map</a>
+
+<h1 class="text-2xl font-bold mb-2"><%= @bed.name %></h1>
+<p class="text-stone-500 mb-6"><%= @bed.bed_type %> — <%= @bed.orientation || "N/A" %></p>
+
+<% @rows.each do |row| %>
+  <div class="mb-4">
+    <h2 class="text-sm font-semibold text-stone-500 mb-2"><%= row.name %></h2>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      <% (@slots_by_row[row.id] || []).each do |slot| %>
+        <% plant = @plants_by_slot[slot.id]&.first %>
+        <div class="bg-white rounded-lg p-3 shadow-sm">
+          <p class="text-xs text-stone-400"><%= slot.name %></p>
+          <% if plant %>
+            <a href="/plants/<%= plant.id %>" class="block">
+              <p class="font-medium"><%= plant.variety_name %></p>
+              <p class="text-xs text-stone-600"><%= plant.lifecycle_stage.tr('_', ' ') %></p>
+            </a>
+          <% else %>
+            <p class="text-stone-400 text-sm">Empty</p>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>

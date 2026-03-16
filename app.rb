@@ -18,3 +18,4 @@ end
 
 require_relative "routes/dashboard"
 require_relative "routes/plants"
+require_relative "routes/beds"
