@@ -8,6 +8,8 @@ class TestSuccession < GardenTest
   end
 
   def test_succession_page_includes_alpine_component
+    SuccessionPlan.create(crop: "Lettuce", varieties: '["Tre Colori"]',
+                          interval_days: 18, total_planned_sowings: 8)
     get "/succession"
     assert_includes last_response.body, "x-data=\"gantt()\""
   end
