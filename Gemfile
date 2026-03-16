@@ -7,7 +7,7 @@ gem "puma", "~> 6.0"
 gem "sequel", "~> 5.0"
 gem "sqlite3", "~> 2.0"
 gem "rufus-scheduler", "~> 3.9"
-gem "anthropic", "~> 0.3"
+gem "ruby_llm"
 gem "httpx", "~> 1.0"
 gem "rake", "~> 13.0"
 
