@@ -22,6 +22,10 @@ class GardenApp
 
     @weather = WeatherService.fetch_current
 
+    @germination_count = @germination_watch.count
+    @upcoming_count = @upcoming_tasks.count
+    @today_count = @today_tasks.count
+
     erb :dashboard
   end
 end

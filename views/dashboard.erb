@@ -1,115 +1,219 @@
-<h1 class="text-2xl font-bold mb-6">Good morning</h1>
+<%# Dashboard — Earthy & Warm redesign %>
 
-<% if @weather %>
-  <div class="bg-blue-50 rounded-lg p-4 mb-6">
-    <div class="flex items-center justify-between">
-      <div>
-        <p class="font-medium text-blue-900">Now: <%= @weather[:current_temp] %>&deg;C — <%= @weather[:condition] %></p>
-      </div>
+<!-- Header -->
+<div class="flex items-center justify-between mb-1">
+  <div class="flex items-center gap-2">
+    <span class="text-xl">🌱</span>
+    <span class="text-lg font-bold" style="color: var(--green-900); letter-spacing: -0.3px;">GardenOS</span>
+  </div>
+  <span class="text-xs" style="color: var(--gray-500);"><%= Date.today.strftime("%a %b %-d") %></span>
+</div>
+
+<% hour = Time.now.hour %>
+<h1 class="text-2xl font-bold mb-4" style="color: var(--text-primary); letter-spacing: -0.5px;">
+  Good <%= hour < 12 ? 'morning ☀️' : hour < 17 ? 'afternoon' : 'evening 🌙' %>
+</h1>
+
+<!-- Alert Banner (frost risk) -->
+<% if @weather&.dig(:frost_risk) %>
+  <% min_low = @weather[:forecast]&.map { |f| f[:low] }&.compact&.min %>
+  <div class="flex items-start gap-3 rounded-r-xl rounded-l-sm px-4 py-3 mb-4"
+       style="border-left: 4px solid #d97706; background: #fef3c7;">
+    <span class="text-lg">❄️</span>
+    <div>
+      <p class="font-semibold text-sm" style="color: #92400e;">Frost risk ahead</p>
+      <p class="text-xs" style="color: #b45309;">Low of <%= min_low %>&deg;C forecast in the next 3 days — protect tender plants.</p>
     </div>
-    <% if @weather[:forecast]&.any? %>
-      <div class="flex gap-4 mt-2">
-        <% @weather[:forecast].each do |day| %>
-          <div class="text-xs text-blue-700">
-            <p><%= day[:date] %></p>
-            <p><%= day[:high] %>&deg; / <%= day[:low] %>&deg;</p>
-            <p><%= day[:condition] %></p>
+  </div>
+<% end %>
+
+<!-- Summary Strip -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+  <!-- Temp -->
+  <div class="bg-white rounded-xl p-3 text-center" style="box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+    <p class="text-2xl font-bold" style="color: var(--green-900);">
+      <%= @weather ? "#{@weather[:current_temp]}°" : "—" %>
+    </p>
+    <p class="text-[9px] uppercase tracking-wide mt-0.5" style="color: var(--gray-500);">
+      <%= @weather ? (@weather[:condition] || "N/A") : "N/A" %>
+    </p>
+  </div>
+  <!-- Tasks -->
+  <div class="bg-white rounded-xl p-3 text-center" style="box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+    <p class="text-2xl font-bold" style="color: var(--green-900);"><%= @today_count %></p>
+    <p class="text-[9px] uppercase tracking-wide mt-0.5" style="color: var(--gray-500);">Tasks</p>
+  </div>
+  <!-- Seeds -->
+  <div class="bg-white rounded-xl p-3 text-center" style="box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+    <p class="text-2xl font-bold" style="color: var(--green-900);"><%= @germination_count %></p>
+    <p class="text-[9px] uppercase tracking-wide mt-0.5" style="color: var(--gray-500);">Seeds</p>
+  </div>
+  <!-- This week -->
+  <div class="bg-white rounded-xl p-3 text-center" style="box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+    <p class="text-2xl font-bold" style="color: var(--green-900);"><%= @upcoming_count %></p>
+    <p class="text-[9px] uppercase tracking-wide mt-0.5" style="color: var(--gray-500);">This week</p>
+  </div>
+</div>
+
+<!-- Segmented Tabs -->
+<div x-data="{ tab: 'tasks' }">
+  <div class="flex p-1 mb-4" style="background: rgba(0,0,0,0.05); border-radius: 10px;">
+    <button @click="tab = 'tasks'"
+            :class="tab === 'tasks' ? 'bg-white shadow-sm font-semibold' : ''"
+            class="flex-1 py-2 text-xs rounded-lg transition-all"
+            :style="tab === 'tasks' ? 'color: var(--green-900)' : 'color: var(--gray-500)'">
+      Tasks
+    </button>
+    <button @click="tab = 'seeds'"
+            :class="tab === 'seeds' ? 'bg-white shadow-sm font-semibold' : ''"
+            class="flex-1 py-2 text-xs rounded-lg transition-all"
+            :style="tab === 'seeds' ? 'color: var(--green-900)' : 'color: var(--gray-500)'">
+      Seeds
+    </button>
+    <button @click="tab = 'weather'"
+            :class="tab === 'weather' ? 'bg-white shadow-sm font-semibold' : ''"
+            class="flex-1 py-2 text-xs rounded-lg transition-all"
+            :style="tab === 'weather' ? 'color: var(--green-900)' : 'color: var(--gray-500)'">
+      Weather
+    </button>
+    <button @click="tab = 'insights'"
+            :class="tab === 'insights' ? 'bg-white shadow-sm font-semibold' : ''"
+            class="flex-1 py-2 text-xs rounded-lg transition-all"
+            :style="tab === 'insights' ? 'color: var(--green-900)' : 'color: var(--gray-500)'">
+      Insights
+    </button>
+  </div>
+
+  <!-- Tasks Panel -->
+  <div x-show="tab === 'tasks'" x-transition>
+    <% if @today_tasks.empty? %>
+      <div class="text-center py-10">
+        <p class="text-sm" style="color: var(--gray-500);">Nothing to do today — enjoy the garden. 🌿</p>
+      </div>
+    <% else %>
+      <div class="space-y-2 mb-4">
+        <% @today_tasks.each do |task| %>
+          <div class="bg-white rounded-xl px-4 py-3 flex items-center gap-3"
+               style="box-shadow: 0 1px 3px rgba(0,0,0,0.06);"
+               x-data="{ done: false }">
+            <div @click="if(!done){ done = true; fetch('/tasks/<%= task.id %>/complete', {method: 'POST'}) }"
+                 class="w-9 h-9 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all"
+                 style="border-color: var(--success); cursor: pointer;"
+                 :style="done ? 'background: var(--success); border-color: var(--success);' : ''">
+              <svg x-show="done" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                   fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="font-semibold text-sm" :class="done ? 'line-through opacity-50' : ''"
+                 style="color: var(--text-primary);"><%= task.title %></p>
+              <% if task.respond_to?(:notes) && !task.notes.nil? && task.notes != "" %>
+                <p class="text-xs text-gray-400 truncate"><%= task.notes %></p>
+              <% end %>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0
+              <%= task.priority == 'must' ? 'bg-red-100 text-red-700' :
+                  task.priority == 'should' ? 'bg-amber-100 text-amber-700' :
+                  'bg-gray-100 text-gray-600' %>">
+              <%= task.priority %>
+            </span>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <% if @upcoming_tasks.any? %>
+      <p class="text-[11px] uppercase tracking-wide mb-2" style="color: var(--gray-500); letter-spacing: 1px;">This week</p>
+      <div class="space-y-1.5">
+        <% @upcoming_tasks.each do |task| %>
+          <div class="bg-white rounded-xl px-4 py-2.5 flex items-center gap-3 opacity-70"
+               style="box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+            <span class="text-xs w-14 flex-shrink-0" style="color: var(--gray-500);">
+              <%= task.due_date.strftime("%a %-d") %>
+            </span>
+            <p class="text-sm font-medium flex-1 truncate" style="color: var(--text-primary);"><%= task.title %></p>
           </div>
         <% end %>
       </div>
     <% end %>
   </div>
-<% else %>
-  <div class="bg-blue-50 rounded-lg p-4 mb-6">
-    <p class="text-sm text-blue-600">Weather data unavailable — check HA connection.</p>
-  </div>
-<% end %>
 
-<% if @weather&.dig(:frost_risk) %>
-  <div class="bg-red-100 border border-red-300 rounded-lg p-4 mb-6">
-    <p class="font-bold text-red-700">Frost warning</p>
-    <% min_low = @weather[:forecast]&.map { |f| f[:low] }&.compact&.min %>
-    <p class="text-sm text-red-600">Low of <%= min_low %>&deg;C forecast in next 3 days.</p>
-  </div>
-<% end %>
-
-<section class="mb-6">
-  <h2 class="text-lg font-semibold mb-3">Today's tasks</h2>
-  <% if @today_tasks.empty? %>
-    <p class="text-stone-500">Nothing scheduled today.</p>
-  <% else %>
-    <ul class="space-y-2">
-      <% @today_tasks.each do |task| %>
-        <li class="bg-white rounded-lg p-3 shadow-sm flex items-center justify-between"
-            x-data="{ done: false }">
-          <div>
-            <span class="font-medium"><%= task.title %></span>
-            <span class="ml-2 text-xs px-2 py-0.5 rounded-full
-              <%= task.priority == 'must' ? 'bg-red-100 text-red-700' :
-                  task.priority == 'should' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-stone-100 text-stone-600' %>">
-              <%= task.priority %>
-            </span>
+  <!-- Seeds Panel -->
+  <div x-show="tab === 'seeds'" x-transition>
+    <% if @germination_watch.empty? %>
+      <div class="text-center py-10">
+        <p class="text-sm" style="color: var(--gray-500);">No seeds germinating right now.</p>
+      </div>
+    <% else %>
+      <div class="space-y-3">
+        <% @germination_watch.each do |plant| %>
+          <% days = plant.days_in_stage.to_i %>
+          <% max_days = 14 %>
+          <% pct = [[((days.to_f / max_days) * 100).round, 100].min, 0].max %>
+          <% bar_color = pct >= 70 ? '#ea580c' : '#86efac' %>
+          <div class="bg-white rounded-xl px-4 py-3" style="box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+            <div class="flex items-center justify-between mb-1">
+              <p class="font-semibold text-sm" style="color: var(--text-primary);"><%= plant.variety_name %></p>
+              <span class="text-xs" style="color: var(--gray-500);">Day <%= days %></span>
+            </div>
+            <p class="text-xs mb-2" style="color: var(--gray-500);"><%= plant.crop_type %> &middot; <%= plant.lifecycle_stage.tr('_', ' ') %></p>
+            <div class="w-full rounded-full h-1.5" style="background: rgba(0,0,0,0.06);">
+              <div class="h-1.5 rounded-full transition-all"
+                   style="width: <%= pct %>%; background: <%= bar_color %>;"></div>
+            </div>
           </div>
-          <button @click="done = true; fetch('/tasks/<%= task.id %>/complete', {method: 'POST'})"
-                  x-show="!done"
-                  class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">
-            Done
-          </button>
-          <span x-show="done" class="text-green-600 text-sm">Completed</span>
-        </li>
-      <% end %>
-    </ul>
-  <% end %>
-</section>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
 
-<section class="mb-6">
-  <h2 class="text-lg font-semibold mb-3">Germination watch</h2>
-  <% if @germination_watch.empty? %>
-    <p class="text-stone-500">Nothing germinating right now.</p>
-  <% else %>
-    <div class="grid grid-cols-2 gap-3">
-      <% @germination_watch.each do |plant| %>
-        <div class="bg-amber-50 rounded-lg p-3 border border-amber-200">
-          <p class="font-medium"><%= plant.variety_name %></p>
-          <p class="text-sm text-stone-600"><%= plant.crop_type %></p>
-          <p class="text-sm">
-            Day <strong><%= plant.days_in_stage %></strong> —
-            <span class="text-amber-700"><%= plant.lifecycle_stage.tr('_', ' ') %></span>
-          </p>
+  <!-- Weather Panel -->
+  <div x-show="tab === 'weather'" x-transition>
+    <% if @weather %>
+      <div class="bg-white rounded-xl px-4 py-5 mb-3" style="box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+        <p class="text-5xl font-bold mb-1" style="color: var(--green-900);"><%= @weather[:current_temp] %>&deg;</p>
+        <p class="text-sm" style="color: var(--gray-500);"><%= @weather[:condition] %></p>
+      </div>
+      <% if @weather[:forecast]&.any? %>
+        <div class="grid grid-cols-3 gap-2">
+          <% @weather[:forecast].first(3).each do |day| %>
+            <div class="bg-white rounded-xl px-3 py-3 text-center" style="box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+              <p class="text-[10px] font-medium mb-1" style="color: var(--gray-500);"><%= day[:date] %></p>
+              <p class="text-sm font-bold" style="color: var(--green-900);"><%= day[:high] %>&deg;</p>
+              <p class="text-xs" style="color: var(--gray-500);"><%= day[:low] %>&deg;</p>
+              <p class="text-[10px] mt-1 truncate" style="color: var(--gray-500);"><%= day[:condition] %></p>
+            </div>
+          <% end %>
         </div>
       <% end %>
-    </div>
-  <% end %>
-</section>
-
-<section class="mb-6">
-  <h2 class="text-lg font-semibold mb-3">Upcoming this week</h2>
-  <% if @upcoming_tasks.empty? %>
-    <p class="text-stone-500">Clear week ahead.</p>
-  <% else %>
-    <ul class="space-y-2">
-      <% @upcoming_tasks.each do |task| %>
-        <li class="bg-white rounded-lg p-3 shadow-sm">
-          <span class="text-sm text-stone-500"><%= task.due_date.strftime("%a %b %-d") %></span>
-          <span class="ml-2 font-medium"><%= task.title %></span>
-        </li>
-      <% end %>
-    </ul>
-  <% end %>
-</section>
-
-<section class="mb-6">
-  <h2 class="text-lg font-semibold mb-3">AI insights</h2>
-  <% if @advisories.empty? %>
-    <p class="text-stone-500">No advisories today yet.</p>
-  <% else %>
-    <div class="space-y-2">
-      <% @advisories.each do |adv| %>
-        <div class="bg-purple-50 rounded-lg p-3 border border-purple-200">
-          <p class="text-sm"><%= adv.content_hash["summary"] rescue adv.content %></p>
+      <% if @weather[:frost_risk] %>
+        <div class="mt-3 rounded-xl px-4 py-3" style="background: #fef2f2;">
+          <p class="text-sm font-semibold" style="color: #991b1b;">❄️ Frost risk in the forecast</p>
         </div>
       <% end %>
-    </div>
-  <% end %>
-</section>
+    <% else %>
+      <div class="text-center py-10">
+        <p class="text-sm" style="color: var(--gray-500);">Can't reach Home Assistant — weather data unavailable.</p>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Insights Panel -->
+  <div x-show="tab === 'insights'" x-transition>
+    <% if @advisories.empty? %>
+      <div class="text-center py-10">
+        <p class="text-sm" style="color: var(--gray-500);">No advisories yet today.</p>
+      </div>
+    <% else %>
+      <div class="space-y-3">
+        <% @advisories.each do |adv| %>
+          <div class="bg-white rounded-xl px-4 py-3" style="box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+            <% begin; adv_text = adv.content_hash["summary"]; rescue; adv_text = adv.content; end %>
+            <p class="text-sm" style="color: var(--text-primary);"><%= adv_text %></p>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>
