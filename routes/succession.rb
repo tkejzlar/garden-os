@@ -169,6 +169,7 @@ class GardenApp
 
   # ── AI Planner Chat ──────────────────────────────────────────────────────
 
+  # Non-streaming fallback
   post "/succession/planner/message" do
     request.body.rewind
     body = begin
@@ -186,8 +187,44 @@ class GardenApp
 
     json({
       content: result[:content],
-      draft: result[:draft]
+      draft: result[:draft],
+      tool_calls: result[:tool_calls]
     })
+  end
+
+  # SSE streaming endpoint
+  get "/succession/planner/stream" do
+    message = params[:message].to_s.strip
+    halt 400, "message required" if message.empty?
+
+    require_relative "../services/planner_service"
+
+    content_type "text/event-stream"
+    headers "Cache-Control" => "no-cache", "Connection" => "keep-alive"
+
+    stream(:keep_open) do |out|
+      service = PlannerService.new
+
+      service.send_message_streaming(message) do |event|
+        case event[:type]
+        when "chunk"
+          out << "data: #{JSON.generate({ type: "chunk", content: event[:content] })}\n\n"
+        when "draft"
+          out << "data: #{JSON.generate({ type: "draft", draft: event[:draft] })}\n\n"
+        when "done"
+          out << "data: #{JSON.generate({ type: "done" })}\n\n"
+          out.close
+        when "error"
+          out << "data: #{JSON.generate({ type: "error", content: event[:content] })}\n\n"
+          out.close
+        end
+      end
+    rescue => e
+      require_relative "../services/garden_logger"
+      GardenLogger.error "[Planner/SSE] Stream error: #{e.message}"
+      out << "data: #{JSON.generate({ type: "error", content: e.message })}\n\n" rescue nil
+      out.close rescue nil
+    end
   end
 
   post "/succession/planner/commit" do

@@ -5,3 +5,5 @@ vendor/bundle
 .bundle
 public/uploads/**/*
 !public/uploads/.gitkeep
+log/
+.superpowers/

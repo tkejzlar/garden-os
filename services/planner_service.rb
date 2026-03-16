@@ -1,6 +1,7 @@
 require "json"
 require_relative "../config/ruby_llm"
 require_relative "../models/planner_message"
+require_relative "garden_logger"
 require_relative "planner_tools/get_beds_tool"
 require_relative "planner_tools/get_seed_inventory_tool"
 require_relative "planner_tools/get_plants_tool"
@@ -22,6 +23,7 @@ class PlannerService
 
   def initialize
     @last_draft = nil
+    @tool_calls = []
   end
 
   def system_prompt
@@ -61,6 +63,8 @@ class PlannerService
 
   def chat
     @chat ||= begin
+      GardenLogger.info "[Planner] Initializing chat with model=#{self.class.model_id} provider=#{self.class.provider}"
+
       c = RubyLLM.chat(model: self.class.model_id, provider: self.class.provider, assume_model_exists: true)
         .with_instructions(system_prompt)
         .with_tool(GetBedsTool)
@@ -70,8 +74,17 @@ class PlannerService
         .with_tool(GetWeatherTool)
         .with_tool(DraftPlanTool)
 
-      # Replay conversation history so the AI has context
-      PlannerMessage.order(:created_at).all.each do |msg|
+      # Log tool calls
+      c.on_tool_call do |tool_call|
+        name = tool_call.respond_to?(:name) ? tool_call.name : tool_call.to_s
+        GardenLogger.info "[Planner] Tool call: #{name}"
+        @tool_calls << { name: name, at: Time.now.iso8601 }
+      end
+
+      # Replay conversation history
+      history = PlannerMessage.order(:created_at).all
+      GardenLogger.info "[Planner] Replaying #{history.length} messages from history"
+      history.each do |msg|
         c.add_message(role: msg.role.to_sym, content: msg.content)
       end
 
@@ -80,25 +93,118 @@ class PlannerService
   end
 
   def send_message(user_text)
+    GardenLogger.info "[Planner] User message: #{user_text.slice(0, 100)}..."
     PlannerMessage.create(role: "user", content: user_text, created_at: Time.now)
 
     Thread.current[:planner_draft] = nil
+    @tool_calls = []
 
+    GardenLogger.info "[Planner] Sending to LLM..."
+    start_time = Time.now
     response = chat.ask(user_text)
+    elapsed = (Time.now - start_time).round(1)
 
     @last_draft = Thread.current[:planner_draft]
 
+    GardenLogger.info "[Planner] Response received in #{elapsed}s, content_length=#{response.content&.length || 0}, tool_calls=#{@tool_calls.length}, has_draft=#{!@last_draft.nil?}"
+
+    if response.content.nil? || response.content.strip.empty?
+      GardenLogger.warn "[Planner] Empty response from LLM!"
+      GardenLogger.warn "[Planner] Tool calls were: #{@tool_calls.map { |tc| tc[:name] }.join(', ')}"
+      GardenLogger.warn "[Planner] Response object: #{response.inspect.slice(0, 500)}"
+
+      GardenLogger.record_gap!(
+        category: "planner-empty-response",
+        summary: "LLM returned empty content after #{elapsed}s",
+        detail: "User said: #{user_text.slice(0, 200)}",
+        context: { tool_calls: @tool_calls, model: self.class.model_id, elapsed_seconds: elapsed }
+      )
+
+      content = "I'm having trouble formulating a response. Let me try again — could you rephrase or simplify your request?"
+    else
+      content = response.content
+    end
+
     PlannerMessage.create(
       role: "assistant",
-      content: response.content,
+      content: content,
       draft_payload: @last_draft ? JSON.generate(@last_draft) : nil,
       created_at: Time.now
     )
 
-    { content: response.content, draft: @last_draft }
+    { content: content, draft: @last_draft, tool_calls: @tool_calls }
   rescue => e
-    warn "PlannerService error: #{e.message}"
+    elapsed = start_time ? (Time.now - start_time).round(1) : 0
+    GardenLogger.error "[Planner] Error after #{elapsed}s: #{e.class}: #{e.message}"
+    GardenLogger.error "[Planner] Backtrace: #{e.backtrace&.first(5)&.join("\n  ")}"
+
+    GardenLogger.record_gap!(
+      category: "planner-error",
+      summary: "#{e.class}: #{e.message}",
+      detail: "User said: #{user_text.slice(0, 200)}",
+      context: {
+        tool_calls: @tool_calls,
+        model: self.class.model_id,
+        elapsed_seconds: elapsed,
+        backtrace: e.backtrace&.first(10)
+      }
+    )
+
     PlannerMessage.create(role: "assistant", content: "Sorry, I encountered an error. Please try again.", created_at: Time.now)
-    { content: "Sorry, I encountered an error: #{e.message}", draft: nil }
+    { content: "Sorry, I encountered an error: #{e.message}", draft: nil, tool_calls: @tool_calls }
+  end
+
+  # Streaming version — yields chunks as they arrive
+  def send_message_streaming(user_text, &block)
+    GardenLogger.info "[Planner/Stream] User message: #{user_text.slice(0, 100)}..."
+    PlannerMessage.create(role: "user", content: user_text, created_at: Time.now)
+
+    Thread.current[:planner_draft] = nil
+    @tool_calls = []
+    full_content = ""
+
+    GardenLogger.info "[Planner/Stream] Starting streaming response..."
+    start_time = Time.now
+
+    chat.ask(user_text) do |chunk|
+      if chunk.respond_to?(:content) && chunk.content
+        full_content += chunk.content
+        block.call({ type: "chunk", content: chunk.content }) if block
+      end
+    end
+
+    elapsed = (Time.now - start_time).round(1)
+    @last_draft = Thread.current[:planner_draft]
+
+    GardenLogger.info "[Planner/Stream] Complete in #{elapsed}s, length=#{full_content.length}, has_draft=#{!@last_draft.nil?}"
+
+    # Send draft as final event if present
+    block.call({ type: "draft", draft: @last_draft }) if @last_draft && block
+
+    # Save to DB
+    PlannerMessage.create(
+      role: "assistant",
+      content: full_content.empty? ? "I couldn't generate a response." : full_content,
+      draft_payload: @last_draft ? JSON.generate(@last_draft) : nil,
+      created_at: Time.now
+    )
+
+    block.call({ type: "done" }) if block
+
+    { content: full_content, draft: @last_draft, tool_calls: @tool_calls }
+  rescue => e
+    elapsed = start_time ? (Time.now - start_time).round(1) : 0
+    GardenLogger.error "[Planner/Stream] Error after #{elapsed}s: #{e.class}: #{e.message}"
+
+    GardenLogger.record_gap!(
+      category: "planner-stream-error",
+      summary: "#{e.class}: #{e.message}",
+      detail: "User said: #{user_text.slice(0, 200)}",
+      context: { model: self.class.model_id, elapsed_seconds: elapsed, backtrace: e.backtrace&.first(10) }
+    )
+
+    block.call({ type: "error", content: "Error: #{e.message}" }) if block
+    PlannerMessage.create(role: "assistant", content: "Sorry, I encountered an error.", created_at: Time.now)
+    { content: "Error: #{e.message}", draft: nil, tool_calls: @tool_calls }
   end
 end
