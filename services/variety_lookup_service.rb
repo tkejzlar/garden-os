@@ -16,13 +16,25 @@ class VarietyLookupService
 
   def self.system_prompt
     <<~PROMPT
-      You are a garden variety identification expert. Given a plant variety name,
-      identify what it is and provide growing information.
+      You are a seed catalog expert specializing in European vegetable and herb varieties.
+      Your knowledge covers major seed suppliers including:
+      - Loukykvět, Semo, Moravoseed (Czech)
+      - Magic Garden Seeds, Dreschflegel, Bingenheimer (German)
+      - Kokopelli, Ferme de Sainte Marthe (French)
+      - Real Seeds, Chiltern Seeds (UK)
+      - Baker Creek, Johnny's Selected Seeds (US)
 
-      Respond with JSON only — no markdown, no explanation:
+      When given a variety name (and optionally a supplier), identify exactly what plant
+      it is and provide detailed growing information. Search your knowledge thoroughly —
+      many varieties have regional names, translations, or catalog-specific naming.
+
+      IMPORTANT: If the name could be a pepper, tomato, or any nightshade variety,
+      check those first — they are the most commonly looked up.
+
+      Respond with JSON only — no markdown, no explanation, no code fences:
       {
-        "crop_type": "tomato|pepper|cucumber|lettuce|radish|herb|flower|pea|bean|other",
-        "variety_notes": "Brief description: origin, fruit type, flavor, disease resistance, etc.",
+        "crop_type": "tomato|pepper|cucumber|lettuce|radish|herb|flower|pea|bean|squash|brassica|onion|root|other",
+        "variety_notes": "Brief but specific description: species, fruit type/shape/color, flavor, origin, disease resistance",
         "days_to_maturity": "65-75",
         "frost_tender": true,
         "sow_indoor_weeks_before_last_frost": 8,
@@ -32,23 +44,28 @@ class VarietyLookupService
         "spacing_cm": 45,
         "height_cm": "150-180",
         "sun": "full",
-        "notes": "Any special growing tips for Prague climate (zone 6b/7a, last frost ~May 13)"
+        "notes": "Growing tips for Prague climate (zone 6b/7a, last frost ~May 13, continental)"
       }
-
-      If you don't recognize the variety name, make your best guess based on the name
-      and note your uncertainty in variety_notes. Set crop_type to your best guess.
     PROMPT
   end
 
-  def self.lookup(variety_name)
+  def self.lookup(variety_name, source: nil)
     return nil if variety_name.nil? || variety_name.strip.empty?
 
     chat = RubyLLM.chat(model: model_id, provider: provider, assume_model_exists: true)
       .with_instructions(system_prompt)
-      .with_temperature(0.2)
+      .with_temperature(0.1)
 
-    response = chat.ask("Variety: #{variety_name.strip}")
-    parsed = JSON.parse(response.content)
+    query = "Identify this seed variety: \"#{variety_name.strip}\""
+    query += " (from #{source.strip})" if source && !source.strip.empty?
+
+    response = chat.ask(query)
+
+    # Strip markdown code fences if the model wraps its response
+    text = response.content.strip
+    text = text.sub(/\A```(?:json)?\s*/, "").sub(/\s*```\z/, "")
+
+    parsed = JSON.parse(text)
     parse_response(parsed)
   rescue => e
     warn "VarietyLookup error: #{e.message}"

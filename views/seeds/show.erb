@@ -58,7 +58,10 @@
             if (!name) return;
             this.loading = true;
             try {
-              const resp = await fetch('/api/seeds/lookup?q=' + encodeURIComponent(name));
+              const source = this.$refs.source ? this.$refs.source.value.trim() : '';
+              let url = '/api/seeds/lookup?q=' + encodeURIComponent(name);
+              if (source) url += '&source=' + encodeURIComponent(source);
+              const resp = await fetch(url);
               if (!resp.ok) throw new Error('Lookup failed');
               const data = await resp.json();
               if (data.crop_type) this.$refs.crop_type.value = data.crop_type;
@@ -95,19 +98,19 @@
     </div>
 
     <div>
-      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Crop type *</label>
-      <input type="text" name="crop_type" x-ref="crop_type" required
-             value="<%= @packet.crop_type %>"
-             placeholder="e.g. tomato, herb, pepper"
+      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Source <span class="font-normal">(helps AI identify the variety)</span></label>
+      <input type="text" name="source" x-ref="source"
+             value="<%= @packet.source %>"
+             placeholder="e.g. Loukykvět, Magic Garden Seeds"
              class="w-full rounded-lg px-3 py-2.5 text-sm border"
              style="border-color: #e5e7eb; color: var(--text-primary);">
     </div>
 
     <div>
-      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Source</label>
-      <input type="text" name="source"
-             value="<%= @packet.source %>"
-             placeholder="e.g. Loukykvět, saved"
+      <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Crop type *</label>
+      <input type="text" name="crop_type" x-ref="crop_type" required
+             value="<%= @packet.crop_type %>"
+             placeholder="auto-filled by lookup, or type manually"
              class="w-full rounded-lg px-3 py-2.5 text-sm border"
              style="border-color: #e5e7eb; color: var(--text-primary);">
     </div>

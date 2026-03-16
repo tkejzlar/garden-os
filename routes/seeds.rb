@@ -12,7 +12,8 @@ class GardenApp
     halt 400, json(error: "q parameter required") if variety.empty?
 
     require_relative "../services/variety_lookup_service"
-    result = VarietyLookupService.lookup(variety)
+    source = params[:source].to_s.strip
+    result = VarietyLookupService.lookup(variety, source: source.empty? ? nil : source)
 
     if result
       json result
