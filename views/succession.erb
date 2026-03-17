@@ -480,6 +480,40 @@
       </div>
     </template>
   </div>
+  <!-- Layout preview -->
+  <template x-if="pendingLayout">
+    <div style="margin: 8px 12px; padding: 10px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px;">
+      <div style="font-size: 11px; font-weight: 600; color: var(--green-900); margin-bottom: 6px;" x-text="'Layout suggestion for ' + pendingLayout.bed_name"></div>
+      <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">
+        <template x-if="pendingLayout.action === 'fill' || pendingLayout.action === 'plan_full'">
+          <span x-text="(pendingLayout.suggestions?.length || 0) + ' plants to add'"></span>
+        </template>
+        <template x-if="pendingLayout.action === 'rearrange'">
+          <span x-text="(pendingLayout.moves?.length || 0) + ' moves suggested'"></span>
+        </template>
+      </div>
+      <template x-if="pendingLayout.suggestions">
+        <div style="margin-bottom: 8px;">
+          <template x-for="s in pendingLayout.suggestions" :key="s.slot_id">
+            <div style="font-size: 10px; color: var(--text-body); padding: 2px 0;">
+              <span x-text="s.variety_name"></span> <span style="color: var(--text-secondary);" x-text="'— ' + (s.reason || s.crop_type)"></span>
+            </div>
+          </template>
+        </div>
+      </template>
+      <template x-if="pendingLayout.moves">
+        <div style="margin-bottom: 8px;">
+          <template x-for="m in pendingLayout.moves" :key="m.plant_id">
+            <div style="font-size: 10px; color: var(--text-body); padding: 2px 0;" x-text="m.reason || 'Move plant'"></div>
+          </template>
+        </div>
+      </template>
+      <div style="display: flex; gap: 8px;">
+        <button @click="applyLayout()" style="padding: 6px 16px; background: var(--green-900); color: white; border: none; border-radius: 8px; font-size: 12px; cursor: pointer;">Apply layout</button>
+        <button @click="dismissLayout()" style="padding: 6px 16px; background: #f3f4f6; color: var(--text-secondary); border: none; border-radius: 8px; font-size: 12px; cursor: pointer;">Dismiss</button>
+      </div>
+    </div>
+  </template>
   <!-- Input -->
   <div style="padding: 12px; margin-top: 8px; border-top: 1px solid #e5e7eb;">
     <form @submit.prevent="sendAIMessage()" style="display: flex; gap: 8px; align-items: center;">
@@ -560,6 +594,7 @@ function planTab() {
     aiMessages: JSON.parse(document.getElementById('planner-data')?.textContent || '[]'),
     aiInput: '',
     aiSending: false,
+    pendingLayout: null,
 
     async sendAIMessage() {
       if (!this.aiInput.trim() || this.aiSending) return;
@@ -590,6 +625,7 @@ function planTab() {
         const data = await res.json();
         if (data.status === 'done') {
           this.aiMessages.push({ role: 'assistant', content: data.content, id: Date.now(), draft: data.draft });
+          if (data.bed_layout) this.pendingLayout = data.bed_layout;
           return;
         }
         if (data.status === 'error') {
@@ -602,6 +638,26 @@ function planTab() {
     sendQuickAction(text) {
       this.aiInput = text;
       this.sendAIMessage();
+    },
+
+    async applyLayout() {
+      if (!this.pendingLayout) return;
+      const layout = this.pendingLayout;
+      const bed = document.querySelector(`[data-bed-name="${layout.bed_name}"]`);
+      const bedId = bed?.dataset?.bedId;
+      if (!bedId) return;
+
+      await fetch(`/beds/${bedId}/apply-layout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(layout)
+      });
+      this.pendingLayout = null;
+      location.reload();
+    },
+
+    dismissLayout() {
+      this.pendingLayout = null;
     }
   }
 }
