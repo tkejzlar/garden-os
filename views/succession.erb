@@ -180,24 +180,28 @@ function plannerChat() {
     },
 
     async commitDraft(draft) {
+      console.log('[Planner] commitDraft called, draft:', draft);
+      if (!draft) { console.error('[Planner] No draft!'); return; }
       try {
         const resp = await fetch('/succession/planner/commit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ draft_payload: draft })
         });
+        console.log('[Planner] Commit response status:', resp.status);
         const data = await resp.json();
+        console.log('[Planner] Commit result:', data);
         if (data.success) {
-          // Mark the draft message as committed
           const msg = this.messages.find(m => m.draft === draft);
           if (msg) msg.committed = true;
-          // Reload the page to refresh Gantt + plan cards
-          setTimeout(() => window.location.reload(), 1000);
+          alert('Plan created! ' + JSON.stringify(data.created));
+          setTimeout(() => window.location.reload(), 1500);
         } else {
           alert('Failed to create plan: ' + (data.errors || []).join(', '));
         }
       } catch(e) {
-        alert('Error creating plan');
+        console.error('[Planner] Commit error:', e);
+        alert('Error creating plan: ' + e.message);
       }
     },
 
