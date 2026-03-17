@@ -97,30 +97,22 @@ class GardenApp
       d = d >> 1
     end
 
-    beds = Bed.where(garden_id: @current_garden.id).eager(rows: {slots: :plants}).all.map do |bed|
-      rows = bed.rows
-      slots = rows.flat_map(&:slots)
-      total_slots = slots.count
-
-      plants = slots.flat_map(&:plants).reject { |p| p.lifecycle_stage == "done" }
+    beds = Bed.where(garden_id: @current_garden.id).eager(:plants).all.map do |bed|
+      active_plants = bed.plants.reject { |p| p.lifecycle_stage == "done" }
 
       occupancy = months.map do |month_str|
         year, month = month_str.split("-").map(&:to_i)
         month_start = Date.new(year, month, 1)
         month_end = (month_start >> 1) - 1
-
-        filled = slots.count do |slot|
-          slot.plants.any? do |plant|
-            start_date = plant.sow_date || plant.created_at&.to_date || today
-            end_date = plant.lifecycle_stage == "done" ? (plant.updated_at&.to_date || today) : season_end
-            start_date <= month_end && end_date >= month_start
-          end
+        filled = active_plants.count do |plant|
+          start_date = plant.sow_date || plant.created_at&.to_date || today
+          end_date = plant.lifecycle_stage == "done" ? (plant.updated_at&.to_date || today) : season_end
+          start_date <= month_end && end_date >= month_start
         end
-
         { month: month_str, filled: filled }
       end
 
-      crops_grouped = plants.group_by(&:crop_type)
+      crops_grouped = active_plants.group_by(&:crop_type)
 
       crops = crops_grouped.map do |crop, crop_plants|
         varieties = crop_plants.map(&:variety_name).uniq
@@ -128,7 +120,7 @@ class GardenApp
         {
           crop: crop,
           varieties: varieties,
-          plant_count: crop_plants.count,
+          plant_count: crop_plants.sum(&:quantity),
           periods: [{
             start: start_date&.to_s,
             end: nil,
@@ -154,13 +146,7 @@ class GardenApp
         end
       end
 
-      {
-        bed_id: bed.id,
-        bed_name: bed.name,
-        total_slots: total_slots,
-        occupancy: occupancy,
-        crops: crops
-      }
+      { bed_id: bed.id, bed_name: bed.name, grid_cols: bed.grid_cols, grid_rows: bed.grid_rows, occupancy: occupancy, crops: crops }
     end
 
     { today: today.to_s, season_start: season_start.to_s, season_end: season_end.to_s, beds: beds }.to_json
@@ -280,35 +266,25 @@ class GardenApp
 
   # ── Bed Layout Endpoints ────────────────────────────────────────────────
 
-  patch "/beds/:id/swap-slots" do
+  patch "/beds/:id/swap-plants" do
     content_type :json
     bed = Bed[params[:id].to_i]
     halt 404, json(error: "Bed not found") unless bed
     halt 403, json(error: "Not your bed") unless bed.garden_id == @current_garden.id
 
     request.body.rewind
-    body = begin
-      JSON.parse(request.body.read)
-    rescue
-      halt 400, json(error: "Invalid JSON")
-    end
+    body = begin JSON.parse(request.body.read) rescue halt 400, json(error: "Invalid JSON") end
 
-    slot_a = Slot[body["slot_a"].to_i]
-    slot_b = Slot[body["slot_b"].to_i]
-    halt 404, json(error: "Slot not found") unless slot_a && slot_b
-
-    bed_slot_ids = bed.rows.flat_map(&:slots).map(&:id)
-    halt 422, json(error: "Slots don't belong to this bed") unless bed_slot_ids.include?(slot_a.id) && bed_slot_ids.include?(slot_b.id)
-
-    plant_a = slot_a.plants.find { |p| p.lifecycle_stage != "done" }
-    plant_b = slot_b.plants.find { |p| p.lifecycle_stage != "done" }
+    plant_a = Plant[body["plant_a"].to_i]
+    plant_b = Plant[body["plant_b"].to_i]
+    halt 404, json(error: "Plant not found") unless plant_a && plant_b
+    halt 422, json(error: "Plants not on this bed") unless plant_a.bed_id == bed.id && plant_b.bed_id == bed.id
 
     DB.transaction do
-      plant_a&.update(slot_id: nil)
-      plant_b&.update(slot_id: slot_a.id, updated_at: Time.now) if plant_b
-      plant_a&.update(slot_id: slot_b.id, updated_at: Time.now) if plant_a
+      ax, ay, aw, ah = plant_a.grid_x, plant_a.grid_y, plant_a.grid_w, plant_a.grid_h
+      plant_a.update(grid_x: plant_b.grid_x, grid_y: plant_b.grid_y, grid_w: plant_b.grid_w, grid_h: plant_b.grid_h, updated_at: Time.now)
+      plant_b.update(grid_x: ax, grid_y: ay, grid_w: aw, grid_h: ah, updated_at: Time.now)
     end
-
     json(ok: true)
   end
 
@@ -319,45 +295,33 @@ class GardenApp
     halt 403, json(error: "Not your bed") unless bed.garden_id == @current_garden.id
 
     request.body.rewind
-    body = begin
-      JSON.parse(request.body.read)
-    rescue
-      halt 400, json(error: "Invalid JSON")
-    end
+    body = begin JSON.parse(request.body.read) rescue halt 400, json(error: "Invalid JSON") end
 
     action = body["action"]
-    bed_slot_ids = bed.rows.flat_map(&:slots).map(&:id)
-
     case action
     when "fill", "plan_full"
       suggestions = body["suggestions"] || []
       created = suggestions.map do |s|
-        slot_id = s["slot_id"].to_i
-        halt 422, json(error: "Slot #{slot_id} doesn't belong to this bed") unless bed_slot_ids.include?(slot_id)
-
         Plant.create(
-          garden_id: @current_garden.id,
-          slot_id: slot_id,
-          variety_name: s["variety_name"],
-          crop_type: s["crop_type"],
+          garden_id: @current_garden.id, bed_id: bed.id,
+          variety_name: s["variety_name"], crop_type: s["crop_type"],
+          grid_x: s["grid_x"]&.to_i || 0, grid_y: s["grid_y"]&.to_i || 0,
+          grid_w: s["grid_w"]&.to_i || 1, grid_h: s["grid_h"]&.to_i || 1,
+          quantity: s["quantity"]&.to_i || 1,
           lifecycle_stage: "seed_packet"
         )
       end
       json(ok: true, created: created.count)
-
     when "rearrange"
       moves = body["moves"] || []
       DB.transaction do
         moves.each do |m|
           plant = Plant[m["plant_id"].to_i]
-          next unless plant && plant.garden_id == @current_garden.id
-          to_slot = m["to_slot_id"].to_i
-          halt 422, json(error: "Slot #{to_slot} doesn't belong to this bed") unless bed_slot_ids.include?(to_slot)
-          plant.update(slot_id: to_slot, updated_at: Time.now)
+          next unless plant && plant.garden_id == @current_garden.id && plant.bed_id == bed.id
+          plant.update(grid_x: m["grid_x"]&.to_i, grid_y: m["grid_y"]&.to_i, grid_w: m["grid_w"]&.to_i || plant.grid_w, grid_h: m["grid_h"]&.to_i || plant.grid_h, updated_at: Time.now)
         end
       end
       json(ok: true)
-
     else
       halt 400, json(error: "Unknown action: #{action}")
     end

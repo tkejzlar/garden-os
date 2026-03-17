@@ -91,12 +91,22 @@ class GardenApp
       halt 400, json(error: "Invalid JSON")
     end
 
-    if body["slot_id"]
-      slot = Slot[body["slot_id"].to_i]
-      halt 404, json(error: "Slot not found") unless slot
-      halt 403, json(error: "Slot not in your garden") unless slot.row.bed.garden_id == @current_garden.id
-      plant.update(slot_id: slot.id, updated_at: Time.now)
+    updates = {}
+    updates[:bed_id] = body["bed_id"].to_i if body["bed_id"]
+    updates[:grid_x] = body["grid_x"].to_i if body["grid_x"]
+    updates[:grid_y] = body["grid_y"].to_i if body["grid_y"]
+    updates[:grid_w] = body["grid_w"].to_i if body["grid_w"]
+    updates[:grid_h] = body["grid_h"].to_i if body["grid_h"]
+    updates[:quantity] = body["quantity"].to_i if body["quantity"]
+    updates[:updated_at] = Time.now if updates.any?
+
+    if updates[:bed_id]
+      bed = Bed[updates[:bed_id]]
+      halt 404, json(error: "Bed not found") unless bed
+      halt 403, json(error: "Not your bed") unless bed.garden_id == @current_garden.id
     end
+
+    plant.update(updates) if updates.any?
 
     json plant.values
   end

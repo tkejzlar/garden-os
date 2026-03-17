@@ -13,22 +13,19 @@
       canvas_height:  bed.canvas_height,
       canvas_points:  bed.canvas_points_array,
       canvas_color:   bed.canvas_color,
-      rows:           bd[:rows].map do |rd|
+      grid_cols:      bed.grid_cols,
+      grid_rows:      bed.grid_rows,
+      plants:         bd[:plants].map do |p|
         {
-          id:    rd[:row].id,
-          name:  rd[:row].name,
-          slots: rd[:slots].map do |sd|
-            plant = sd[:plant]
-            {
-              id:   sd[:slot].id,
-              name: sd[:slot].name,
-              plant: plant ? {
-                id:           plant.id,
-                variety_name: plant.variety_name,
-                crop_type:    plant.crop_type
-              } : nil
-            }
-          end
+          id:             p.id,
+          variety_name:   p.variety_name,
+          crop_type:      p.crop_type,
+          lifecycle_stage: p.lifecycle_stage,
+          grid_x:         p.grid_x,
+          grid_y:         p.grid_y,
+          grid_w:         p.grid_w,
+          grid_h:         p.grid_h,
+          quantity:       p.quantity
         }
       end
     }
@@ -254,32 +251,18 @@
           </div>
         </div>
 
-        <!-- Rows summary + link to full editor -->
-        <div>
-          <p class="text-xs font-medium mb-2" style="color: var(--text-secondary);">Rows / Slots</p>
-          <template x-if="selectedBed.rows && selectedBed.rows.length > 0">
-            <div class="flex flex-col gap-1">
-              <template x-for="row in selectedBed.rows" :key="row.id">
-                <div class="flex items-center gap-2">
-                  <span class="text-xs w-16 shrink-0" style="color: var(--gray-500);" x-text="row.name"></span>
-                  <div class="flex gap-1 flex-wrap">
-                    <template x-for="sd in row.slots" :key="sd.id">
-                      <div
-                        class="w-6 h-6 rounded text-center text-xs flex items-center justify-center font-medium"
-                        :style="slotStyle(sd.plant)"
-                        :title="sd.plant ? sd.plant.variety_name : sd.name"
-                        x-text="sd.plant ? sd.plant.variety_name.slice(0,2) : ''"
-                      ></div>
-                    </template>
-                  </div>
-                </div>
-              </template>
+        <!-- Plants summary -->
+        <div style="margin-top: 12px;">
+          <div style="font-size: 10px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px;">Plants</div>
+          <template x-for="plant in selectedBed.plants" :key="plant.id">
+            <div style="padding: 4px 8px; font-size: 11px; display: flex; justify-content: space-between; background: var(--card-bg); border-radius: 6px; margin-bottom: 2px;">
+              <span x-text="plant.variety_name" style="font-weight: 500;"></span>
+              <span style="color: var(--text-secondary);" x-text="plant.grid_w + '×' + plant.grid_h + ' at (' + plant.grid_x + ',' + plant.grid_y + ')'"></span>
             </div>
           </template>
-          <template x-if="!selectedBed.rows || selectedBed.rows.length === 0">
-            <p class="text-xs" style="color: var(--gray-400);">No rows yet.</p>
+          <template x-if="!selectedBed.plants || selectedBed.plants.length === 0">
+            <div style="font-size: 11px; color: var(--text-secondary); padding: 4px 8px;">No plants placed</div>
           </template>
-          <a :href="'/beds/' + selectedBed.id" class="inline-block mt-2 text-xs" style="color: var(--green-900);">Edit rows & slots →</a>
         </div>
 
         <!-- Delete -->
@@ -490,18 +473,21 @@ function gardenDesigner(bedsData) {
           g.appendChild(self._createSvgEl('rect', { x: bx, y: by, width: bw, height: bh, fill: fill, stroke: stroke, 'stroke-width': sw, rx: 3 }));
 
           // Plant overlay
-          if (self.showPlants && bed.rows) {
-            bed.rows.forEach((row, ri) => {
-              row.slots.forEach((sd, si) => {
-                if (sd.plant) {
-                  g.appendChild(self._createSvgEl('text', {
-                    x: bx + 4 + si * 18, y: by + 14 + ri * 16, 'font-size': 9,
-                    fill: self.cropTextColor(sd.plant.crop_type),
-                    'font-family': 'system-ui, sans-serif', 'font-weight': 600,
-                    textContent: sd.plant.variety_name.slice(0, 2)
-                  }));
-                }
-              });
+          if (self.showPlants && bed.plants) {
+            bed.plants.forEach(plant => {
+              if (plant.grid_x == null) return;
+              const scaleX = bw / (bed.grid_cols * 10);
+              const scaleY = bh / (bed.grid_rows * 10);
+              const px = bx + plant.grid_x * 10 * scaleX;
+              const py = by + plant.grid_y * 10 * scaleY;
+              const pw = plant.grid_w * 10 * scaleX;
+              const ph = plant.grid_h * 10 * scaleY;
+              g.appendChild(self._createSvgEl('rect', {
+                x: px, y: py, width: pw, height: ph,
+                fill: self.plantColor(plant.crop_type),
+                opacity: 0.6, rx: 2,
+                style: 'pointer-events:none;'
+              }));
             });
           }
 
@@ -606,10 +592,8 @@ function gardenDesigner(bedsData) {
       return (this.cropColors[cropType] || { text: '#374151' }).text;
     },
 
-    slotStyle(plant) {
-      if (!plant) return 'background: #f9fafb; border: 1px solid #e5e7eb; color: #9ca3af;';
-      const c = this.cropColors[plant.crop_type] || { bg: '#f3f4f6', text: '#374151' };
-      return `background: ${c.bg}; color: ${c.text}; border: 1px solid ${c.bg};`;
+    plantColor(cropType) {
+      return (this.cropColors[cropType] || { bg: '#d1fae5' }).bg;
     },
 
     polygonCentroid(pts) {
@@ -869,7 +853,7 @@ function gardenDesigner(bedsData) {
       })
       .then(r => r.json())
       .then(newBed => {
-        newBed.rows = [];
+        newBed.plants = [];
         // Server returns canvas_points as JSON string — parse it back to array
         if (typeof newBed.canvas_points === 'string') {
           try { newBed.canvas_points = JSON.parse(newBed.canvas_points); } catch(e) { newBed.canvas_points = []; }

@@ -72,17 +72,17 @@ class TestSuccession < GardenTest
   end
 
   def test_bed_timeline_api
-    bed = Bed.create(garden_id: @garden.id, name: "BB1")
-    row = Row.create(bed_id: bed.id, name: "R1", position: 1)
-    slot = Slot.create(row_id: row.id, name: "S1", position: 1)
+    bed = Bed.create(garden_id: @garden.id, name: "BB1", width: 40, length: 30)
 
     plant = Plant.create(
       garden_id: @garden.id,
-      slot_id: slot.id,
+      bed_id: bed.id,
       variety_name: "Raf",
       crop_type: "tomato",
       lifecycle_stage: "planted_out",
-      sow_date: Date.today - 30
+      sow_date: Date.today - 30,
+      grid_x: 0, grid_y: 0, grid_w: 1, grid_h: 1,
+      quantity: 1
     )
 
     get "/api/plan/bed-timeline"
@@ -95,48 +95,48 @@ class TestSuccession < GardenTest
 
     bed_data = data["beds"].first
     assert_equal "BB1", bed_data["bed_name"]
-    assert_equal 1, bed_data["total_slots"]
+    assert bed_data.key?("grid_cols")
+    assert bed_data.key?("grid_rows")
     assert bed_data["occupancy"].is_a?(Array)
     assert bed_data["crops"].is_a?(Array)
     assert_equal "tomato", bed_data["crops"].first["crop"]
   end
 
-  def test_swap_slots
-    bed = Bed.create(garden_id: @garden.id, name: "SwapBed")
-    row = Row.create(bed_id: bed.id, position: 1, name: "R1")
-    slot_a = Slot.create(row_id: row.id, position: 1, name: "A1")
-    slot_b = Slot.create(row_id: row.id, position: 2, name: "B1")
+  def test_swap_plants
+    bed = Bed.create(garden_id: @garden.id, name: "SwapBed", width: 40, length: 30)
 
-    plant_a = Plant.create(garden_id: @garden.id, slot_id: slot_a.id, variety_name: "Raf", crop_type: "tomato", lifecycle_stage: "seedling")
-    plant_b = Plant.create(garden_id: @garden.id, slot_id: slot_b.id, variety_name: "Basil", crop_type: "herb", lifecycle_stage: "seedling")
+    plant_a = Plant.create(garden_id: @garden.id, bed_id: bed.id, variety_name: "Raf", crop_type: "tomato", lifecycle_stage: "seedling", grid_x: 0, grid_y: 0, grid_w: 1, grid_h: 1, quantity: 1)
+    plant_b = Plant.create(garden_id: @garden.id, bed_id: bed.id, variety_name: "Basil", crop_type: "herb", lifecycle_stage: "seedling", grid_x: 2, grid_y: 1, grid_w: 1, grid_h: 1, quantity: 1)
 
-    patch "/beds/#{bed.id}/swap-slots", { slot_a: slot_a.id, slot_b: slot_b.id }.to_json, { "CONTENT_TYPE" => "application/json" }
+    patch "/beds/#{bed.id}/swap-plants", { plant_a: plant_a.id, plant_b: plant_b.id }.to_json, { "CONTENT_TYPE" => "application/json" }
     assert_equal 200, last_response.status
 
     plant_a.refresh
     plant_b.refresh
-    assert_equal slot_b.id, plant_a.slot_id
-    assert_equal slot_a.id, plant_b.slot_id
+    assert_equal 2, plant_a.grid_x
+    assert_equal 1, plant_a.grid_y
+    assert_equal 0, plant_b.grid_x
+    assert_equal 0, plant_b.grid_y
   end
 
   def test_apply_layout_fill
-    bed = Bed.create(garden_id: @garden.id, name: "FillBed")
-    row = Row.create(bed_id: bed.id, position: 1, name: "R1")
-    slot = Slot.create(row_id: row.id, position: 1, name: "S1")
+    bed = Bed.create(garden_id: @garden.id, name: "FillBed", width: 40, length: 30)
 
     post "/beds/#{bed.id}/apply-layout", {
       action: "fill",
       suggestions: [
-        { slot_id: slot.id, variety_name: "Cherry Belle", crop_type: "radish" }
+        { variety_name: "Cherry Belle", crop_type: "radish", grid_x: 1, grid_y: 2, grid_w: 1, grid_h: 1, quantity: 1 }
       ]
     }.to_json, { "CONTENT_TYPE" => "application/json" }
 
     assert_equal 200, last_response.status
 
-    plant = Plant.where(slot_id: slot.id).first
+    plant = Plant.where(bed_id: bed.id, variety_name: "Cherry Belle").first
     assert plant
     assert_equal "Cherry Belle", plant.variety_name
     assert_equal "radish", plant.crop_type
     assert_equal "seed_packet", plant.lifecycle_stage
+    assert_equal 1, plant.grid_x
+    assert_equal 2, plant.grid_y
   end
 end

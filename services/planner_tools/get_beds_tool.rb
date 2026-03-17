@@ -3,22 +3,17 @@ require_relative "../../models/bed"
 require_relative "../../models/plant"
 
 class GetBedsTool < RubyLLM::Tool
-  description "Get all garden beds with dimensions, rows, slots, and which plants are currently assigned to each slot"
+  description "Get all garden beds with dimensions, grid layout, and which plants are currently assigned"
 
   def execute
     garden_id = Thread.current[:current_garden_id]
     beds = (garden_id ? Bed.where(garden_id: garden_id) : Bed).all.map do |bed|
-      rows = Row.where(bed_id: bed.id).order(:position).all.map do |row|
-        slots = Slot.where(row_id: row.id).order(:position).all.map do |slot|
-          plant = Plant.where(slot_id: slot.id).exclude(lifecycle_stage: "done").first
-          {
-            position: slot.position,
-            name: slot.name,
-            plant: plant ? { variety_name: plant.variety_name, crop_type: plant.crop_type, stage: plant.lifecycle_stage } : nil
-          }
-        end
-        { name: row.name, slots: slots }
-      end
+      plants = Plant.where(bed_id: bed.id).exclude(lifecycle_stage: "done").all.map { |p|
+        { id: p.id, variety_name: p.variety_name, crop_type: p.crop_type,
+          lifecycle_stage: p.lifecycle_stage,
+          grid_x: p.grid_x, grid_y: p.grid_y, grid_w: p.grid_w, grid_h: p.grid_h,
+          quantity: p.quantity }
+      }
 
       # Use real dimensions if set, otherwise derive from canvas (1 canvas unit = 1 cm)
       points = bed.canvas_points_array
@@ -49,9 +44,10 @@ class GetBedsTool < RubyLLM::Tool
         width_cm: width_cm,
         area_sqm: area_sqm,
         orientation: bed.orientation,
-        rows: rows,
-        total_slots: rows.sum { |r| r[:slots].length },
-        occupied_slots: rows.sum { |r| r[:slots].count { |s| s[:plant] } }
+        grid_cols: bed.grid_cols,
+        grid_rows: bed.grid_rows,
+        plants: plants,
+        total_plants: plants.length
       }
     end
 

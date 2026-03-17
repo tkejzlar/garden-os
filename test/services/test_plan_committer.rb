@@ -4,17 +4,14 @@ require_relative "../../services/plan_committer"
 class TestPlanCommitter < GardenTest
   def setup
     super
-    # Create a bed with rows and slots for testing
-    @bed = Bed.create(name: "BB1", bed_type: "raised", garden_id: @garden.id)
-    row = Row.create(bed_id: @bed.id, name: "A", position: 1)
-    Slot.create(row_id: row.id, name: "Pos 1", position: 1)
-    Slot.create(row_id: row.id, name: "Pos 2", position: 2)
+    # Create a bed with grid dimensions for testing
+    @bed = Bed.create(name: "BB1", bed_type: "raised", garden_id: @garden.id, width: 120, length: 240)
   end
 
   def test_commit_assignments
     draft = {
       "assignments" => [
-        { "bed_name" => "BB1", "row_name" => "A", "slot_position" => 1,
+        { "bed_name" => "BB1",
           "variety_name" => "Raf", "crop_type" => "tomato", "source" => "Reinsaat" }
       ],
       "successions" => [],
@@ -24,7 +21,7 @@ class TestPlanCommitter < GardenTest
     assert result[:success]
     assert_equal 1, result[:created][:plants]
     assert_equal "Raf", Plant.first.variety_name
-    assert_equal @bed.id, Plant.first.slot.row.bed.id
+    assert_equal @bed.id, Plant.first.bed_id
   end
 
   def test_commit_successions
