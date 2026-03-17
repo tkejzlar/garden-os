@@ -1,4 +1,4 @@
-<%# views/succession.erb — Plan Hub %>
+<%# views/succession.erb — Plan Hub (tabbed layout) %>
 
 <style>
   @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
@@ -27,844 +27,501 @@
   .md-content th { background: #f8fafc; font-weight: 600; }
 </style>
 
-<script>
-  window.__PLANNER_MESSAGES__ = <%= @planner_messages.map { |m|
-    { role: m.role, content: m.content, draft: m.draft_data, created_at: m.created_at.to_i }
-  }.to_json %>;
-</script>
+<script id="planner-data" type="application/json"><%= @planner_messages.map { |m| { role: m.role, content: m.content, id: m.id, draft: m.draft_payload ? JSON.parse(m.draft_payload) : nil } }.to_json %></script>
 
-<!-- Summary Strip -->
-<div class="grid grid-cols-4 gap-2 mb-6">
-  <div class="rounded-xl p-3 text-center" style="background: #fef2f2; border: 1px solid #fecaca;">
-    <div class="text-xl font-bold" style="color: #991b1b;"><%= @overdue_count %></div>
-    <div class="text-xs font-medium" style="color: #991b1b;">Overdue</div>
-  </div>
-  <div class="rounded-xl p-3 text-center" style="background: #fffbeb; border: 1px solid #fde68a;">
-    <div class="text-xl font-bold" style="color: #92400e;"><%= @due_this_week_count %></div>
-    <div class="text-xs font-medium" style="color: #92400e;">This week</div>
-  </div>
-  <div class="rounded-xl p-3 text-center" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
-    <div class="text-xl font-bold" style="color: #166534;"><%= @done_count %></div>
-    <div class="text-xs font-medium" style="color: #166534;">Done</div>
-  </div>
-  <div class="rounded-xl p-3 text-center" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-    <div class="text-xl font-bold" style="color: #1e293b;"><%= @succession_count %></div>
-    <div class="text-xs font-medium" style="color: #64748b;">Plans</div>
-  </div>
-</div>
+<div x-data="planTab()">
 
-<!-- AI Garden Planner Chat -->
-<div x-data="plannerChat()" class="mb-6">
-  <!-- Header -->
-  <div class="flex items-center justify-between mb-3">
-    <button @click="chatOpen = !chatOpen" class="flex items-center gap-2">
-      <h2 class="text-lg font-semibold" style="color: var(--text-primary);">Garden Planner</h2>
-      <span x-text="chatOpen ? '▼' : '▶'" class="text-xs" style="color: var(--gray-400);"></span>
-    </button>
-    <button x-show="chatOpen" @click="clearChat()" class="text-xs" style="color: var(--gray-400);">New chat</button>
+<!-- ── Summary Strip ── -->
+<div style="padding: 14px 16px 10px; background: linear-gradient(135deg, var(--green-50), var(--yellow-50));">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+    <div style="font-size: 16px; font-weight: 700; color: var(--green-900);">Season Plan</div>
+    <div style="font-size: 11px; color: var(--text-secondary);"><%= @total_plants %> plants · <%= @succession_count %> successions</div>
   </div>
-
-  <!-- Chat area -->
-  <div x-show="chatOpen" x-transition>
-    <!-- Messages -->
-    <div x-ref="chatMessages" class="space-y-3 mb-3 overflow-y-auto" style="max-height: 50vh;">
-      <template x-for="msg in messages" :key="msg.id || msg.created_at">
-        <div>
-          <!-- User message -->
-          <div x-show="msg.role === 'user'" class="flex justify-end">
-            <div class="rounded-xl px-4 py-2 text-sm max-w-[80%]" style="background: #d1fae5; color: var(--text-primary);" x-text="msg.content"></div>
-          </div>
-          <!-- AI message -->
-          <div x-show="msg.role === 'assistant'" class="flex justify-start">
-            <div class="rounded-xl px-4 py-3 text-sm max-w-[85%]" style="background: white; box-shadow: var(--card-shadow);">
-              <div x-html="typeof marked !== 'undefined' ? marked.parse(msg.content || '') : msg.content" class="md-content"></div>
-              <!-- Draft card if present -->
-              <div x-show="msg.draft" class="mt-3 p-3 rounded-lg" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
-                <p class="text-xs font-semibold mb-2" style="color: #166534;">Plan Draft</p>
-                <p class="text-xs mb-1" x-text="(msg.draft?.assignments?.length || 0) + ' bed assignments'"></p>
-                <p class="text-xs mb-1" x-text="(msg.draft?.successions?.length || 0) + ' succession schedules'"></p>
-                <p class="text-xs mb-2" x-text="(msg.draft?.tasks?.length || 0) + ' tasks'"></p>
-                <button @click="commitDraft(msg.draft)"
-                  class="text-xs px-3 py-1.5 rounded-lg font-medium"
-                  :class="msg.committed ? '' : 'hover:opacity-90'"
-                  :disabled="msg.committed"
-                  :style="msg.committed ? 'background: #d1fae5; color: #166534;' : 'background: var(--green-900); color: white;'"
-                  x-text="msg.committed ? 'Plan created ✓' : 'Create this plan'">
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-      <!-- Thinking indicator -->
-      <template x-if="sending">
-        <div class="flex justify-start">
-          <div class="rounded-xl px-4 py-3 text-sm flex items-center gap-2" style="background: white; box-shadow: var(--card-shadow); color: var(--gray-500);">
-            <svg width="14" height="14" viewBox="0 0 16 16" style="animation: blink 1s ease infinite;">
-              <circle cx="8" cy="8" r="5" fill="currentColor"/>
-            </svg>
-            Thinking...
-          </div>
-        </div>
-      </template>
+  <div style="display: flex; gap: 8px;">
+    <div style="flex: 1; background: var(--card-bg); border-radius: 8px; padding: 8px; text-align: center; box-shadow: var(--card-shadow);">
+      <div style="font-size: 18px; font-weight: 700; color: var(--green-900);"><%= @due_this_week_count %></div>
+      <div style="font-size: 9px; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.5px;">This week</div>
     </div>
-
-    <!-- Commit latest draft — standalone button outside template loop -->
-    <div x-show="latestDraft()" class="mb-3 p-3 rounded-lg" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
-      <p class="text-xs font-semibold mb-1" style="color: #166534;">Latest plan ready</p>
-      <button @click="commitDraft(latestDraft())"
-        class="text-xs px-3 py-1.5 rounded-lg font-medium"
-        style="background: var(--green-900); color: white;">
-        Create this plan
-      </button>
+    <div style="flex: 1; background: var(--card-bg); border-radius: 8px; padding: 8px; text-align: center; box-shadow: var(--card-shadow);">
+      <div style="font-size: 18px; font-weight: 700; color: <%= @overdue_count > 0 ? 'var(--warning)' : 'var(--green-900)' %>;"><%= @overdue_count %></div>
+      <div style="font-size: 9px; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.5px;">Overdue</div>
     </div>
-
-    <!-- Input -->
-    <div class="flex gap-2 items-end">
-      <textarea x-model="input" @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
-             @input="$el.style.height = 'auto'; $el.style.height = Math.min($el.scrollHeight, 150) + 'px'"
-             placeholder="What would you like to grow?"
-             rows="1"
-             class="flex-1 rounded-xl px-4 py-2.5 text-sm border resize-none"
-             style="border-color: #e5e7eb; max-height: 150px; overflow-y: auto;" :disabled="sending"></textarea>
-      <button @click="sendMessage()" :disabled="sending || !input.trim()"
-              class="px-4 py-2.5 rounded-xl text-sm font-medium shrink-0"
-              style="background: var(--green-900); color: white;">
-        Send
-      </button>
+    <div style="flex: 1; background: var(--card-bg); border-radius: 8px; padding: 8px; text-align: center; box-shadow: var(--card-shadow);">
+      <div style="font-size: 18px; font-weight: 700; color: var(--green-900);"><%= @done_count %><span style="font-size: 12px; color: var(--gray-400);">/<%= @total_task_count %></span></div>
+      <div style="font-size: 9px; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.5px;">Done</div>
     </div>
   </div>
 </div>
 
-<script>
-function plannerChat() {
-  return {
-    messages: window.__PLANNER_MESSAGES__ || [],
-    input: '',
-    sending: false,
-    chatOpen: true,
-
-    async sendMessage() {
-      const text = this.input.trim();
-      if (!text || this.sending) return;
-
-      this.messages.push({ role: 'user', content: text, created_at: Date.now() });
-      this.input = '';
-      this.sending = true;
-      this.scrollToBottom();
-
-      // Kick off the AI in background — returns immediately with a request ID
-      try {
-        console.log('[Planner] Sending ask...');
-        const resp = await fetch('/succession/planner/ask', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text })
-        });
-        const askData = await resp.json();
-        console.log('[Planner] Got request_id:', askData.request_id);
-
-        if (!askData.request_id) {
-          throw new Error('No request_id returned: ' + JSON.stringify(askData));
-        }
-
-        // Poll for the response
-        await this.pollForResponse(askData.request_id);
-      } catch(e) {
-        console.error('[Planner] Error:', e);
-        this.messages.push({ role: 'assistant', content: 'Sorry, something went wrong: ' + e.message, created_at: Date.now() });
-        this.sending = false;
-      }
-    },
-
-    async pollForResponse(requestId) {
-      console.log('[Planner] Polling for', requestId);
-      const maxAttempts = 60; // 60 * 2s = 2 minutes max
-      for (let i = 0; i < maxAttempts; i++) {
-        await new Promise(r => setTimeout(r, 2000));
-        try {
-          const resp = await fetch('/succession/planner/result/' + requestId);
-          const data = await resp.json();
-          console.log('[Planner] Poll', i, ':', data.status, data.content?.length || 0, 'chars');
-
-          if (data.status === 'done') {
-            this.messages.push({
-              role: 'assistant',
-              content: data.content,
-              draft: data.draft,
-              created_at: Date.now()
-            });
-            this.sending = false;
-            this.scrollToBottom();
-            return;
-          }
-          // status === 'pending' — keep polling
-        } catch(e) {
-          console.warn('[Planner] Poll error:', e.message);
-          // Network error — keep trying
-        }
-      }
-      // Timed out
-      this.messages.push({ role: 'assistant', content: 'Request timed out. Please try again.', created_at: Date.now() });
-      this.sending = false;
-    },
-
-    async commitDraft(draft) {
-      console.log('[Planner] commitDraft called, draft:', draft);
-      if (!draft) { console.error('[Planner] No draft!'); return; }
-      try {
-        const resp = await fetch('/succession/planner/commit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ draft_payload: draft })
-        });
-        console.log('[Planner] Commit response status:', resp.status);
-        const data = await resp.json();
-        console.log('[Planner] Commit result:', data);
-        if (data.success) {
-          const msg = this.messages.find(m => m.draft === draft);
-          if (msg) msg.committed = true;
-          alert('Plan created! ' + JSON.stringify(data.created));
-          setTimeout(() => window.location.reload(), 1500);
-        } else {
-          alert('Failed to create plan: ' + (data.errors || []).join(', '));
-        }
-      } catch(e) {
-        console.error('[Planner] Commit error:', e);
-        alert('Error creating plan: ' + e.message);
-      }
-    },
-
-    async clearChat() {
-      if (!confirm('Start a new planning conversation?')) return;
-      await fetch('/succession/planner/messages', { method: 'DELETE' });
-      this.messages = [];
-    },
-
-    latestDraft() {
-      // Find the most recent message with a draft that hasn't been committed
-      for (let i = this.messages.length - 1; i >= 0; i--) {
-        if (this.messages[i].draft && !this.messages[i].committed) return this.messages[i].draft;
-      }
-      return null;
-    },
-
-    scrollToBottom() {
-      this.$nextTick(() => {
-        const el = this.$refs.chatMessages;
-        if (el) el.scrollTop = el.scrollHeight;
-      });
-    }
-  };
-}
-</script>
-
-<!-- Plan Management -->
-<div class="mb-4 flex items-center justify-between">
-  <h1 class="text-2xl font-bold" style="color: var(--text-primary); letter-spacing: -0.5px;">Plan</h1>
-  <div class="flex gap-2">
-    <a href="/succession/plans/new"
-       class="text-sm px-3 py-1.5 rounded-lg font-medium"
-       style="background: var(--green-900); color: white;">+ New Plan</a>
-  </div>
+<!-- ── Tab Bar ── -->
+<div style="display: flex; background: var(--card-bg); border-bottom: 1px solid #e5e7eb; padding: 0 8px;">
+  <template x-for="t in ['tasks', 'timeline', 'beds']">
+    <button @click="tab = t" :style="tab === t ? 'font-weight: 600; color: var(--green-900); border-bottom: 2px solid var(--green-900);' : 'color: var(--gray-400);'" style="flex: 1; padding: 10px 0; text-align: center; font-size: 12px; background: none; border: none; cursor: pointer; margin-bottom: -1px;" x-text="t.charAt(0).toUpperCase() + t.slice(1)"></button>
+  </template>
 </div>
 
-<!-- Active Plans Summary -->
-<% if @plans.any? %>
-  <div class="mb-4 space-y-2">
-    <% @plans.each do |plan| %>
-      <% completed = Task.where(task_type: "sow").where(Sequel.like(:title, "%#{plan.crop}%")).where(status: "done").count
-         total = plan.total_planned_sowings || 0
-         has_tasks = Task.where(task_type: "sow").where(Sequel.like(:title, "%#{plan.crop}%")).any? %>
-      <div class="flex items-center gap-3 px-4 py-3"
-           style="background: white; border-radius: var(--card-radius); box-shadow: var(--card-shadow);">
-        <div class="flex-1">
-          <span class="font-semibold text-sm" style="color: var(--text-primary);"><%= plan.crop %></span>
-          <span class="text-xs ml-2" style="color: var(--gray-500);"><%= completed %>/<%= total %> · every <%= plan.interval_days %>d</span>
-        </div>
-        <% unless has_tasks %>
-          <form method="post" action="/succession/plans/<%= plan.id %>/generate" class="inline">
-            <button class="text-xs px-2 py-1 rounded-lg font-medium"
-                    style="background: #d1fae5; color: #065f46;">Generate tasks</button>
-          </form>
-        <% end %>
-        <a href="/succession/plans/<%= plan.id %>/edit"
-           class="text-xs px-2 py-1 rounded-lg"
-           style="background: #f3f4f6; color: var(--gray-500);">Edit</a>
-      </div>
-    <% end %>
-  </div>
-<% end %>
+<!-- ── Tasks Tab Panel ── -->
+<div x-show="tab === 'tasks'" style="padding: 12px 16px;">
+  <% today = Date.today; week_end = today + 7 %>
+  <% overdue = @all_tasks.select { |t| t.due_date && t.due_date < today } %>
+  <% this_week = @all_tasks.select { |t| t.due_date && t.due_date >= today && t.due_date <= week_end } %>
+  <% later = @all_tasks.select { |t| t.due_date.nil? || t.due_date > week_end } %>
 
-<!-- Quick Add Task (inline form) -->
-<div x-data="{ showTaskForm: false }" class="mb-6">
-  <button @click="showTaskForm = !showTaskForm"
-          class="text-sm font-medium"
-          style="color: var(--green-900);">
-    <span x-text="showTaskForm ? '− Cancel' : '+ Add task'"></span>
-  </button>
-
-  <div x-show="showTaskForm" x-transition class="mt-3 px-4 py-4"
-       style="background: white; border-radius: var(--card-radius); box-shadow: var(--card-shadow);">
-    <form method="post" action="/succession/tasks" class="flex flex-col gap-3">
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Title *</label>
-          <input type="text" name="title" required placeholder="e.g. Prepare bed BB1"
-                 class="w-full rounded-lg px-3 py-2 text-sm border" style="border-color: #e5e7eb;">
-        </div>
-        <div>
-          <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Type</label>
-          <select name="task_type" class="w-full rounded-lg px-3 py-2 text-sm border" style="border-color: #e5e7eb;">
-            <option value="sow">Sow</option>
-            <option value="transplant">Transplant</option>
-            <option value="prep">Prep</option>
-            <option value="feed">Feed</option>
-            <option value="water">Water</option>
-            <option value="harvest">Harvest</option>
-            <option value="check">Check</option>
-            <option value="build">Build</option>
-            <option value="order">Order</option>
-          </select>
-        </div>
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Due date</label>
-          <input type="date" name="due_date" value="<%= Date.today %>"
-                 class="w-full rounded-lg px-3 py-2 text-sm border" style="border-color: #e5e7eb;">
-        </div>
-        <div>
-          <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Priority</label>
-          <select name="priority" class="w-full rounded-lg px-3 py-2 text-sm border" style="border-color: #e5e7eb;">
-            <option value="should">Should</option>
-            <option value="must">Must</option>
-            <option value="could">Could</option>
-          </select>
-        </div>
-      </div>
-      <div>
-        <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Notes</label>
-        <input type="text" name="notes" placeholder="Optional"
-               class="w-full rounded-lg px-3 py-2 text-sm border" style="border-color: #e5e7eb;">
-      </div>
-      <button type="submit" class="py-2 rounded-lg font-semibold text-sm text-white"
-              style="background: var(--green-900);">Add Task</button>
-    </form>
-  </div>
-</div>
-
-<!-- Task Timeline — all upcoming tasks grouped by month -->
-<% if @all_tasks.any? %>
-  <div class="mb-6">
-    <h2 class="text-lg font-semibold mb-3" style="color: var(--text-primary);">Upcoming Tasks</h2>
-    <%
-      tasks_by_month = @all_tasks.group_by { |t| t.due_date ? t.due_date.strftime("%B %Y") : "No date" }
-    %>
-    <% tasks_by_month.each do |month, tasks| %>
-      <p class="mb-2 mt-4 first:mt-0" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; color: var(--gray-500);">
-        <%= month %>
-      </p>
-      <div class="space-y-1.5">
-        <% tasks.each do |task| %>
-          <div class="flex items-center gap-3 px-3 py-2.5"
-               style="background: white; border-radius: var(--card-radius); box-shadow: var(--card-shadow);">
-            <form method="post" action="/tasks/<%= task.id %>/complete" class="shrink-0">
-              <button type="submit" class="w-6 h-6 rounded-full border-2 flex items-center justify-center"
-                      style="border-color: var(--success); cursor: pointer;"
-                      title="Mark done"></button>
-            </form>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium truncate" style="color: var(--text-primary);"><%= task.title %></p>
-              <p class="text-xs" style="color: var(--gray-500);">
-                <%= task.due_date&.strftime("%a %b %-d") %>
-                <% if task.notes && !task.notes.empty? %>
-                  · <span style="color: var(--text-secondary);"><%= task.notes.slice(0, 80) %></span>
-                <% end %>
-              </p>
-            </div>
-            <span class="text-xs px-2 py-0.5 rounded-full shrink-0"
-                  style="<%= task.priority == 'must' ? 'background: #fef2f2; color: #991b1b;' :
-                            task.priority == 'should' ? 'background: #fef3c7; color: #92400e;' :
-                            'background: #f3f4f6; color: var(--gray-500);' %>">
-              <%= task.priority %>
-            </span>
+  <% if overdue.any? %>
+    <div style="font-size: 10px; font-weight: 600; color: var(--warning); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Overdue</div>
+    <% overdue.each do |task| %>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--alert-red-bg); border-radius: 10px; margin-bottom: 6px; border-left: 3px solid var(--warning);">
+        <button @click="fetch('/tasks/<%= task.id %>/complete', {method:'POST'}).then(() => location.reload())" style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--warning); background: none; cursor: pointer; flex-shrink: 0;"></button>
+        <div style="flex: 1;">
+          <div style="font-size: 13px; font-weight: 500; color: var(--text-primary);"><%= task.title %></div>
+          <div style="font-size: 11px; color: var(--warning);">
+            <%= (today - task.due_date).to_i %> days overdue
+            <% if task.beds.any? %> · <%= task.beds.map(&:name).join(", ") %><% end %>
           </div>
+        </div>
+        <% if task.priority %>
+          <div style="font-size: 10px; padding: 2px 8px; border-radius: 10px;
+            <% case task.priority
+               when 'must' then %>background: var(--alert-red-bg); color: var(--alert-red-text);<%
+               when 'should' then %>background: var(--alert-amber-bg); color: #92400e;<%
+               else %>background: #f3f4f6; color: var(--text-secondary);<% end %>
+          "><%= task.priority %></div>
         <% end %>
       </div>
     <% end %>
-  </div>
-
-  <% if @done_tasks.any? %>
-    <details class="mb-6">
-      <summary class="text-sm font-medium cursor-pointer" style="color: var(--gray-500);">
-        <%= @done_tasks.length %> completed tasks
-      </summary>
-      <div class="mt-2 space-y-1">
-        <% @done_tasks.each do |task| %>
-          <div class="px-3 py-2 text-sm" style="color: var(--gray-400); text-decoration: line-through;">
-            <%= task.title %>
-          </div>
-        <% end %>
-      </div>
-    </details>
   <% end %>
-<% end %>
 
-<!-- Gantt chart (only when plans exist) -->
-<% if @plans.empty? %>
-  <div class="text-center py-12" style="color: var(--text-secondary);">
-    <p class="text-lg mb-2">No succession plans yet</p>
-    <p class="text-sm mb-4">Create a plan to start tracking your sowing schedule.</p>
-    <a href="/succession/plans/new"
-       class="inline-block px-4 py-2 rounded-lg font-semibold text-sm text-white"
-       style="background: var(--green-900);">Create your first plan</a>
-  </div>
-<% else %>
-
-<div
-  x-data="gantt()"
-  x-init="init()"
-  class="mb-6"
->
-
-  <!-- ── Zoom toggle ── -->
-  <div class="flex justify-end mb-4">
-    <div class="flex gap-2">
-      <button
-        @click="setZoom('week')"
-        :class="zoom === 'week' ? 'font-semibold' : 'opacity-50'"
-        class="text-sm px-3 py-1 rounded-full border transition"
-        style="border-color: var(--green-900); color: var(--green-900);"
-      >Week</button>
-      <button
-        @click="setZoom('month')"
-        :class="zoom === 'month' ? 'font-semibold' : 'opacity-50'"
-        class="text-sm px-3 py-1 rounded-full border transition"
-        style="border-color: var(--green-900); color: var(--green-900);"
-      >Month</button>
-    </div>
-  </div>
-
-  <!-- ── Loading / empty states ── -->
-  <template x-if="loading">
-    <p class="text-center py-12" style="color: var(--text-secondary);">Loading…</p>
-  </template>
-
-  <template x-if="!loading && plans.length === 0">
-    <div class="text-center py-12" style="color: var(--text-secondary);">
-      <p class="text-base">No succession plans set up. Create one to see the timeline.</p>
-    </div>
-  </template>
-
-  <!-- ── Gantt chart ── -->
-  <template x-if="!loading && plans.length > 0">
-    <div>
-
-      <!-- Outer scroll wrapper -->
-      <div
-        id="gantt-scroll"
-        class="overflow-x-auto rounded-xl"
-        style="background: white; box-shadow: var(--card-shadow);"
-      >
-        <!-- Inner: fixed left label column + scrolling timeline -->
-        <div class="flex" style="min-width: max-content;">
-
-          <!-- Left label column (sticky) -->
-          <div
-            class="flex-shrink-0 sticky left-0 z-20"
-            style="width: 120px; background: white; border-right: 1px solid #e5e7eb;"
-          >
-            <!-- Corner spacer (aligns with header row) -->
-            <div style="height: 40px; border-bottom: 1px solid #e5e7eb;"></div>
-            <!-- One label per plan row -->
-            <template x-for="plan in plans" :key="plan.plan_id">
-              <div
-                class="flex items-center px-3 text-sm font-medium truncate"
-                style="height: 48px; color: var(--text-primary); border-bottom: 1px solid #f3f4f6;"
-                :title="plan.crop"
-                x-text="plan.crop"
-              ></div>
-            </template>
+  <% if this_week.any? %>
+    <div style="font-size: 10px; font-weight: 600; color: var(--green-900); text-transform: uppercase; letter-spacing: 0.5px; margin: 12px 0 6px;">This week</div>
+    <% this_week.each do |task| %>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--card-bg); border-radius: 10px; margin-bottom: 6px; box-shadow: var(--card-shadow);">
+        <button @click="fetch('/tasks/<%= task.id %>/complete', {method:'POST'}).then(() => location.reload())" style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--green-900); background: none; cursor: pointer; flex-shrink: 0;"></button>
+        <div style="flex: 1;">
+          <div style="font-size: 13px; font-weight: 500;"><%= task.title %></div>
+          <div style="font-size: 11px; color: var(--text-secondary);">
+            <%= task.due_date == today ? "Today" : task.due_date == today + 1 ? "Tomorrow" : task.due_date.strftime("%b %-d") %>
+            <% if task.beds.any? %> · <%= task.beds.map(&:name).join(", ") %><% end %>
           </div>
+        </div>
+        <% if task.priority %>
+          <div style="font-size: 10px; padding: 2px 8px; border-radius: 10px;
+            <% case task.priority
+               when 'must' then %>background: var(--alert-red-bg); color: var(--alert-red-text);<%
+               when 'should' then %>background: var(--alert-amber-bg); color: #92400e;<%
+               else %>background: #f3f4f6; color: var(--text-secondary);<% end %>
+          "><%= task.priority %></div>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
 
-          <!-- Timeline area -->
-          <div class="flex-1 relative" :style="`width: ${timelineWidth}px`">
+  <% if later.any? %>
+    <div style="font-size: 10px; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.5px; margin: 12px 0 6px;">Later</div>
+    <div style="opacity: 0.6;">
+      <% later.each do |task| %>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card-bg); border-radius: 10px; margin-bottom: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+          <div style="width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #d1d5db; flex-shrink: 0;"></div>
+          <div style="flex: 1;">
+            <div style="font-size: 12px; color: var(--text-secondary);"><%= task.title %></div>
+            <div style="font-size: 10px; color: var(--gray-400);"><%= task.due_date&.strftime("%b %-d") %></div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
 
-            <!-- Week/month header -->
-            <div
-              class="flex sticky top-0 z-10"
-              style="height: 40px; border-bottom: 1px solid #e5e7eb; background: #f9faf8;"
-            >
-              <template x-for="seg in headerSegments" :key="seg.label + seg.left">
-                <div
-                  class="absolute flex items-center pl-2 text-xs font-semibold overflow-hidden whitespace-nowrap"
-                  style="height: 40px; color: var(--text-secondary); border-right: 1px solid #e5e7eb;"
-                  :style="`left: ${seg.left}px; width: ${seg.width}px;`"
-                  x-text="seg.label"
-                ></div>
+  <% if @all_tasks.empty? %>
+    <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary); font-size: 14px;">
+      No tasks yet — use the AI planner to get started.
+    </div>
+  <% end %>
+</div>
+
+<!-- ── Timeline Tab Panel ── -->
+<div x-show="tab === 'timeline'" style="padding: 12px 0;">
+  <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 16px; margin-bottom: 10px;">
+    <div style="font-size: 11px; font-weight: 600; color: var(--green-900);">Bed Occupancy</div>
+  </div>
+
+  <template x-if="loading">
+    <div style="text-align: center; padding: 40px; color: var(--text-secondary);">Loading timeline...</div>
+  </template>
+
+  <template x-if="!loading && timelineData">
+    <div style="padding: 0 16px;">
+      <!-- Month headers -->
+      <div style="display: flex; margin-bottom: 6px;">
+        <div style="width: 48px;"></div>
+        <div style="flex: 1; display: flex;">
+          <template x-for="m in timelineData.beds[0]?.occupancy || []" :key="m.month">
+            <div style="flex: 1; font-size: 9px; color: var(--gray-400); text-align: center;" x-text="['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m.month.split('-')[1])-1]"></div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Today marker -->
+      <div style="position: relative; padding: 0 16px; pointer-events: none;">
+        <div :style="(() => {
+          const ss = new Date(timelineData.season_start);
+          const se = new Date(timelineData.season_end);
+          const now = new Date(timelineData.today);
+          const pct = (now - ss) / (se - ss) * 100;
+          if (pct < 0 || pct > 100) return 'display:none;';
+          return 'position:absolute; left:calc(48px + 16px + (100% - 48px - 32px) * ' + (pct/100) + '); top:0; height:300px; width:1.5px; background:#ef4444; z-index:10;';
+        })()">
+          <div style="position:absolute; top:-2px; left:-10px; font-size:8px; color:#ef4444; font-weight:600;">Today</div>
+        </div>
+      </div>
+
+      <!-- Bed rows -->
+      <template x-for="bed in timelineData.beds" :key="bed.bed_id">
+        <div style="margin-bottom: 4px;">
+          <!-- Collapsed heat-map bar -->
+          <div style="display: flex; align-items: center; gap: 6px; cursor: pointer;" @click="toggleBed(bed.bed_id)">
+            <div style="width: 42px; font-size: 11px; font-weight: 600; color: var(--green-900); text-align: right;" x-text="bed.bed_name + (isBedExpanded(bed.bed_id) ? ' ▾' : ' ▸')"></div>
+            <div style="flex: 1; height: 28px; border-radius: 6px; display: flex; overflow: hidden; border: 1px solid #e5e7eb;">
+              <template x-for="m in bed.occupancy" :key="m.month">
+                <div style="flex: 1;" :style="'background: ' + occupancyColor(m.filled, bed.total_slots)"></div>
               </template>
             </div>
+          </div>
 
-            <!-- Today marker -->
-            <div
-              class="absolute top-0 bottom-0 z-30 pointer-events-none"
-              style="width: 2px; background: #dc2626;"
-              :style="`left: ${todayLeft}px;`"
-            >
-              <div
-                class="absolute top-10 text-xs font-bold px-1 rounded"
-                style="background: #dc2626; color: white; transform: translateX(-50%); white-space: nowrap;"
-              >Today</div>
-            </div>
-
-            <!-- Plan rows -->
-            <template x-for="(plan, rowIdx) in plans" :key="plan.plan_id">
-              <div
-                class="relative"
-                style="height: 48px; border-bottom: 1px solid #f3f4f6;"
-                :style="`width: ${timelineWidth}px;`"
-              >
-                <!-- Grid day lines (subtle) -->
-                <template x-for="seg in headerSegments" :key="'line-' + seg.left">
-                  <div
-                    class="absolute top-0 bottom-0 pointer-events-none"
-                    style="width: 1px; background: #f3f4f6;"
-                    :style="`left: ${seg.left}px;`"
-                  ></div>
-                </template>
-
-                <!-- Bars -->
-                <template x-for="bar in plan.bars" :key="bar.task_id">
-                  <div
-                    class="absolute flex items-center justify-center rounded cursor-pointer select-none text-xs font-semibold text-white transition-shadow hover:shadow-md"
-                    :style="barStyle(bar)"
-                    :title="bar.label + ' — ' + bar.due_date"
-                    @mousedown="startDrag($event, bar)"
-                    @touchstart.prevent="startDrag($event, bar)"
-                    @click.stop="openPopover(bar, plan)"
-                  >
-                    <span
-                      class="truncate px-1"
-                      x-text="bar.label"
-                      style="pointer-events: none;"
-                    ></span>
+          <!-- Expanded crop rows -->
+          <template x-if="isBedExpanded(bed.bed_id)">
+            <div style="background: white; border-radius: 8px; padding: 6px 8px; margin-top: 4px; border: 1px solid var(--green-900);">
+              <template x-for="crop in bed.crops" :key="crop.crop">
+                <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px; padding-left: 8px;">
+                  <div style="width: 50px; font-size: 9px; color: var(--text-secondary); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" x-text="crop.crop"></div>
+                  <div style="flex: 1; height: 12px; background: var(--green-50); border-radius: 3px; position: relative;">
+                    <template x-for="(period, pi) in crop.periods" :key="pi">
+                      <div :style="(() => {
+                        const ss = new Date(timelineData.season_start);
+                        const se = new Date(timelineData.season_end);
+                        const span = se - ss;
+                        const ps = period.start ? new Date(period.start) : ss;
+                        const pe = period.end ? new Date(period.end) : se;
+                        const left = Math.max(0, (ps - ss) / span * 100);
+                        const width = Math.min(100 - left, (pe - ps) / span * 100);
+                        return 'position: absolute; height: 100%; border-radius: 3px;' +
+                          (period.status === 'planned' ? 'border: 1px dashed rgba(34,197,94,0.6); background: rgba(34,197,94,0.08);' : 'background: rgba(34,197,94,0.25);') +
+                          'left:' + left + '%; width:' + Math.max(2, width) + '%;';
+                      })()"></div>
+                    </template>
                   </div>
-                </template>
-              </div>
-            </template>
-
-          </div><!-- /timeline area -->
-        </div><!-- /flex row -->
-      </div><!-- /scroll wrapper -->
-
-    </div>
-  </template>
-
-  <!-- ── Popover ── -->
-  <template x-if="popover.open">
-    <div
-      class="fixed inset-0 z-50 flex items-end justify-center pb-8 px-4"
-      style="background: rgba(0,0,0,0.4);"
-      @click.self="closePopover()"
-    >
-      <div
-        class="w-full max-w-sm rounded-2xl p-5 shadow-xl"
-        style="background: white;"
-        @click.stop
-      >
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-lg font-bold" style="color: var(--text-primary);" x-text="popover.plan.crop + ' — ' + popover.bar.label"></h2>
-          <button @click="closePopover()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                  <div style="font-size: 8px; color: var(--gray-400); width: 24px; text-align: right;" x-text="'x' + crop.plant_count"></div>
+                </div>
+              </template>
+            </div>
+          </template>
         </div>
+      </template>
 
-        <dl class="text-sm space-y-1 mb-4" style="color: var(--text-secondary);">
-          <div>
-            <dt class="inline font-medium" style="color: var(--text-primary);">Due: </dt>
-            <dd class="inline" x-text="popover.bar.due_date || '—'"></dd>
-          </div>
-          <div>
-            <dt class="inline font-medium" style="color: var(--text-primary);">Status: </dt>
-            <dd class="inline capitalize" x-text="popover.bar.status"></dd>
-          </div>
-          <div x-show="popover.plan.varieties.length > 0">
-            <dt class="inline font-medium" style="color: var(--text-primary);">Varieties: </dt>
-            <dd class="inline" x-text="popover.plan.varieties.join(', ')"></dd>
-          </div>
-          <div x-show="popover.plan.target_beds.length > 0">
-            <dt class="inline font-medium" style="color: var(--text-primary);">Beds: </dt>
-            <dd class="inline" x-text="popover.plan.target_beds.join(', ')"></dd>
-          </div>
-          <div x-show="popover.plan.interval_days">
-            <dt class="inline font-medium" style="color: var(--text-primary);">Interval: </dt>
-            <dd class="inline" x-text="'every ' + popover.plan.interval_days + ' days'"></dd>
-          </div>
-        </dl>
-
-        <template x-if="popover.bar.status !== 'done'">
-          <button
-            @click="markDone(popover.bar)"
-            :disabled="popover.saving"
-            class="w-full py-2 rounded-xl text-sm font-semibold text-white transition"
-            style="background: #16a34a;"
-            :style="popover.saving ? 'opacity: 0.6; cursor: not-allowed;' : ''"
-          >
-            <span x-text="popover.saving ? 'Saving…' : 'Mark done'"></span>
-          </button>
-        </template>
-        <template x-if="popover.bar.status === 'done'">
-          <p class="text-center text-sm font-semibold" style="color: #16a34a;">Completed</p>
-        </template>
+      <!-- Legend -->
+      <div style="display: flex; gap: 12px; justify-content: center; margin-top: 14px;">
+        <div style="display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-secondary);">
+          <div style="width: 16px; height: 10px; background: rgba(34,197,94,0.05); border-radius: 2px; border: 1px solid #e5e7eb;"></div> Empty
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-secondary);">
+          <div style="width: 16px; height: 10px; background: rgba(34,197,94,0.4); border-radius: 2px;"></div> Partial
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-secondary);">
+          <div style="width: 16px; height: 10px; background: rgba(34,197,94,0.6); border-radius: 2px;"></div> Full
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-secondary);">
+          <div style="width: 16px; height: 10px; background: rgba(34,197,94,0.08); border-radius: 2px; border: 1px dashed rgba(34,197,94,0.6);"></div> Planned
+        </div>
       </div>
     </div>
   </template>
 
-  <!-- Drag ghost layer (catches move/up events anywhere on page) -->
-  <template x-if="drag.active">
-    <div
-      class="fixed inset-0 z-40 cursor-grabbing"
-      style="background: transparent;"
-      @mousemove.window="onDragMove($event)"
-      @mouseup.window="endDrag($event)"
-      @touchmove.window.prevent="onDragMove($event)"
-      @touchend.window="endDrag($event)"
-    ></div>
+  <template x-if="!loading && !timelineData?.beds?.length">
+    <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary); font-size: 14px;">
+      No plantings yet — use the AI planner to get started.
+    </div>
   </template>
-
 </div>
 
-<% end %>
+<!-- ── Beds Tab Panel ── -->
+<div x-show="tab === 'beds'" style="padding: 12px 16px;">
+  <%
+    beds = Bed.where(garden_id: @current_garden.id).all
+    arches = Arch.where(garden_id: @current_garden.id).all
+    stations = IndoorStation.where(garden_id: @current_garden.id).all
+  %>
+
+  <% if beds.any? || arches.any? || stations.any? %>
+    <!-- Occupancy summary pills -->
+    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;">
+      <% beds.each do |bed| %>
+        <% slots = bed.rows.flat_map(&:slots); filled = slots.count { |s| s.plants.any? { |p| p.lifecycle_stage != "done" } } %>
+        <div style="padding: 4px 10px; background: var(--card-bg); border-radius: 8px; font-size: 11px; box-shadow: var(--card-shadow);">
+          <span style="font-weight: 600; color: var(--green-900);"><%= bed.name %></span>
+          <span style="color: var(--text-secondary);"><%= filled %>/<%= slots.count %></span>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if beds.any? %>
+    <div style="font-size: 10px; font-weight: 600; color: var(--green-900); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Outdoor Beds</div>
+    <% beds.each do |bed| %>
+      <div style="background: var(--card-bg); border-radius: var(--card-radius); padding: 12px; margin-bottom: 10px; box-shadow: var(--card-shadow);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div>
+            <div style="font-size: 14px; font-weight: 600; color: var(--green-900);"><%= bed.name %></div>
+            <% rows = bed.rows.sort_by(&:position); total_slots = rows.flat_map(&:slots).count %>
+            <div style="font-size: 10px; color: var(--text-secondary);"><%= rows.count %> rows · <%= total_slots %> slots</div>
+          </div>
+          <% filled = rows.flat_map(&:slots).count { |s| s.plants.any? { |p| p.lifecycle_stage != "done" } } %>
+          <div style="font-size: 12px; font-weight: 600; color: var(--green-900);"><%= filled %>/<%= total_slots %> <span style="font-weight: 400; color: var(--text-secondary);">filled</span></div>
+        </div>
+        <!-- Slot grid -->
+        <div style="display: flex; flex-direction: column; gap: 3px;">
+          <% rows.each do |row| %>
+            <div style="display: flex; gap: 3px;">
+              <% row.slots.sort_by(&:position).each do |slot| %>
+                <% plant = slot.plants.find { |p| p.lifecycle_stage != "done" } %>
+                <% if plant %>
+                  <a href="/plants/<%= plant.id %>" style="flex: 1; background: <%=
+                    case plant.crop_type.to_s.downcase
+                    when 'tomato', 'pepper', 'eggplant' then '#fef2f2'
+                    when 'lettuce', 'spinach', 'chard', 'kale' then '#f0fdf4'
+                    when 'herb', 'basil' then '#ecfdf5'
+                    when 'flower' then '#fefce8'
+                    when 'cucumber', 'squash', 'melon', 'zucchini' then '#f0f9ff'
+                    else '#f9fafb'
+                    end %>; border-radius: 6px; padding: 6px 8px; text-decoration: none;">
+                    <div style="font-size: 11px; font-weight: 500; color: var(--text-primary);"><%= plant.variety_name %></div>
+                    <div style="font-size: 9px; color: var(--text-secondary);"><%= plant.crop_type %> · <%= plant.lifecycle_stage.tr('_', ' ') %></div>
+                  </a>
+                <% else %>
+                  <div @click="openAIForBed('<%= bed.name %>', <%= bed.rows.flat_map(&:slots).count { |s| s.plants.none? { |p| p.lifecycle_stage != 'done' } } %>)" style="flex: 1; background: #f9fafb; border-radius: 6px; padding: 6px 8px; border: 1px dashed #d1d5db; cursor: pointer;">
+                    <div style="font-size: 11px; color: var(--gray-400);">Empty</div>
+                  </div>
+                <% end %>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <% if arches.any? %>
+    <div style="font-size: 10px; font-weight: 600; color: #8b5cf6; text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px;">Arches</div>
+    <% arches.each do |arch| %>
+      <div style="background: var(--card-bg); border-radius: var(--card-radius); padding: 12px; margin-bottom: 8px; box-shadow: var(--card-shadow); border-left: 3px solid #8b5cf6;">
+        <div style="font-size: 13px; font-weight: 600; color: var(--green-900);"><%= arch.name %></div>
+        <div style="font-size: 10px; color: var(--text-secondary);">
+          <%= arch.respond_to?(:between_beds) ? arch.between_beds : '' %>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <% if stations.any? %>
+    <div style="font-size: 10px; font-weight: 600; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px;">Indoor Stations</div>
+    <% stations.each do |station| %>
+      <div style="background: var(--card-bg); border-radius: var(--card-radius); padding: 12px; margin-bottom: 8px; box-shadow: var(--card-shadow); border-left: 3px solid #f59e0b;">
+        <div style="font-size: 13px; font-weight: 600; color: var(--green-900);"><%= station.name %></div>
+        <div style="font-size: 10px; color: var(--text-secondary);"><%= station.respond_to?(:station_type) ? station.station_type : 'Indoor' %></div>
+        <% indoor_plants = Plant.where(indoor_station_id: station.id).exclude(lifecycle_stage: "done").all %>
+        <% if indoor_plants.any? %>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-top: 6px;">
+            <% indoor_plants.each do |plant| %>
+              <a href="/plants/<%= plant.id %>" style="background: #fef2f2; border-radius: 3px; padding: 3px; text-align: center; font-size: 8px; color: var(--text-secondary); text-decoration: none;">
+                <%= plant.variety_name.split.first[0..2] %>
+              </a>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
+
+  <% if beds.empty? && arches.empty? && stations.empty? %>
+    <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary); font-size: 14px;">
+      No beds set up yet.
+    </div>
+  <% end %>
+</div>
+
+<!-- ── AI FAB ── -->
+<div @click="$refs.aiDrawer.showModal ? $refs.aiDrawer.showModal() : null" style="position: fixed; bottom: 80px; right: 16px; width: 44px; height: 44px; background: var(--green-900); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; box-shadow: 0 2px 10px rgba(54,83,20,0.3); cursor: pointer; z-index: 40;">
+  &#10022;
+</div>
+
+<!-- ── AI Drawer (dialog inside planTab scope) ── -->
+<dialog x-ref="aiDrawer" style="position: fixed; bottom: 0; left: 0; right: 0; margin: 0; padding: 0; border: none; background: white; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); max-height: 85vh; width: 100%; max-width: 100%;">
+  <!-- Handle -->
+  <div style="display: flex; justify-content: center; padding: 8px; cursor: pointer;" @click="$refs.aiDrawer.close()">
+    <div style="width: 36px; height: 4px; background: #d1d5db; border-radius: 2px;"></div>
+  </div>
+  <!-- Context banner -->
+  <div style="margin: 0 12px 8px; padding: 8px 12px; background: var(--green-50); border-radius: 8px; border: 1px solid #dcfce7;">
+    <div style="font-size: 10px; color: var(--green-900); font-weight: 600;" x-text="'Context: ' + tab + ' tab' + (selectedBed ? ' → ' + selectedBed.name : '')"></div>
+    <div x-show="selectedBed" style="font-size: 10px; color: var(--text-secondary);" x-text="selectedBed ? selectedBed.empty_count + ' empty slots' : ''"></div>
+  </div>
+  <!-- Quick actions (tab-contextual) -->
+  <div style="padding: 0 12px; display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;">
+    <template x-if="tab === 'tasks' || !tab">
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <button @click="sendQuickAction('What should I do this week?')" style="font-size: 11px; padding: 6px 12px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px; color: var(--green-900); cursor: pointer;">What should I do this week?</button>
+        <button @click="sendQuickAction('Reprioritize my tasks')" style="font-size: 11px; padding: 6px 12px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px; color: var(--green-900); cursor: pointer;">Reprioritize my tasks</button>
+      </div>
+    </template>
+    <template x-if="tab === 'timeline'">
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <button @click="sendQuickAction('Any gaps I should fill?')" style="font-size: 11px; padding: 6px 12px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px; color: var(--green-900); cursor: pointer;">Any gaps I should fill?</button>
+        <button @click="sendQuickAction('Plan next month')" style="font-size: 11px; padding: 6px 12px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px; color: var(--green-900); cursor: pointer;">Plan next month</button>
+      </div>
+    </template>
+    <template x-if="tab === 'beds'">
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <button @click="sendQuickAction('What should I plant here?')" style="font-size: 11px; padding: 6px 12px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px; color: var(--green-900); cursor: pointer;">What should I plant here?</button>
+        <button @click="sendQuickAction('Rotation suggestions')" style="font-size: 11px; padding: 6px 12px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px; color: var(--green-900); cursor: pointer;">Rotation suggestions</button>
+      </div>
+    </template>
+  </div>
+  <!-- Messages -->
+  <div x-ref="aiMessages" style="padding: 0 12px; max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+    <template x-for="msg in aiMessages" :key="msg.id">
+      <div :style="msg.role === 'user' ? 'align-self: flex-end; background: var(--green-50); max-width: 80%;' : 'background: #f9fafb; max-width: 85%;'" style="border-radius: 10px; padding: 10px 12px;">
+        <div x-show="msg.role === 'assistant'" style="font-size: 10px; color: var(--green-900); font-weight: 600; margin-bottom: 4px;">&#10022; AI Planner</div>
+        <div style="font-size: 12px; color: var(--text-body); line-height: 1.5;" x-html="msg.role === 'assistant' ? marked.parse(msg.content || '') : msg.content" class="md-content"></div>
+        <!-- Draft card -->
+        <template x-if="msg.draft">
+          <div style="margin-top: 8px; padding: 10px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px;">
+            <div style="font-size: 11px; color: var(--green-900); font-weight: 600; margin-bottom: 6px;">Plan Draft</div>
+            <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;" x-text="(msg.draft.assignments?.length || 0) + ' plants, ' + (msg.draft.tasks?.length || 0) + ' tasks, ' + (msg.draft.successions?.length || 0) + ' successions'"></div>
+            <button @click="fetch('/succession/planner/commit', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(msg.draft)}).then(() => location.reload())" style="padding: 6px 16px; background: var(--green-900); color: white; border: none; border-radius: 8px; font-size: 12px; cursor: pointer;">Create this plan</button>
+          </div>
+        </template>
+      </div>
+    </template>
+  </div>
+  <!-- Input -->
+  <div style="padding: 12px; margin-top: 8px; border-top: 1px solid #e5e7eb;">
+    <form @submit.prevent="sendAIMessage()" style="display: flex; gap: 8px; align-items: center;">
+      <input x-model="aiInput" type="text" placeholder="Ask about your plan..." style="flex: 1; background: #f3f4f6; border-radius: 10px; padding: 10px 14px; font-size: 12px; border: none; outline: none;">
+      <button type="submit" style="width: 36px; height: 36px; background: var(--green-900); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; border: none; cursor: pointer;">&#8593;</button>
+    </form>
+  </div>
+</dialog>
+
+</div><!-- /x-data="planTab()" -->
 
 <script>
-function gantt() {
+function planTab() {
   return {
-    // ── State ──────────────────────────────────────────────────────────
-    loading: true,
-    plans: [],
-    today: null,
+    tab: 'tasks',
+    expandedBeds: [],
+    selectedBed: null,
+    timelineData: null,
+    loading: false,
 
-    zoom: 'week',      // 'week' | 'month'
-    dayPx: 28,         // pixels per day (week view default)
-    windowDays: 120,   // total days shown
-
-    // Timeline window: starts 14 days before today
-    startDate: null,
-
-    drag: {
-      active: false,
-      bar: null,
-      originX: 0,         // pageX at mousedown
-      originalLeft: 0,    // bar's left px at drag start
-      currentLeft: 0      // live left px during drag
+    init() {
+      this.fetchTimeline();
     },
 
-    popover: {
-      open: false,
-      bar: null,
-      plan: null,
-      saving: false
-    },
-
-    // ── Init ───────────────────────────────────────────────────────────
-    async init() {
-      this.loading = true
+    async fetchTimeline() {
+      this.loading = true;
       try {
-        const res = await fetch('/api/succession/gantt')
-        const data = await res.json()
-        this.today = new Date(data.today + 'T00:00:00')
-        this.startDate = new Date(this.today)
-        this.startDate.setDate(this.startDate.getDate() - 14)
-        this.plans = data.plans
-      } catch (e) {
-        console.error('Gantt load failed', e)
-      } finally {
-        this.loading = false
+        const res = await fetch('/api/plan/bed-timeline');
+        this.timelineData = await res.json();
+      } catch(e) {
+        console.error('Timeline fetch failed:', e);
       }
+      this.loading = false;
     },
 
-    // ── Zoom ───────────────────────────────────────────────────────────
-    setZoom(z) {
-      this.zoom = z
-      this.dayPx = z === 'week' ? 28 : 12
+    toggleBed(bedId) {
+      const idx = this.expandedBeds.indexOf(bedId);
+      if (idx >= 0) this.expandedBeds.splice(idx, 1);
+      else this.expandedBeds.push(bedId);
     },
 
-    // ── Computed geometry ──────────────────────────────────────────────
-    get timelineWidth() {
-      return this.windowDays * this.dayPx
+    isBedExpanded(bedId) {
+      return this.expandedBeds.includes(bedId);
     },
 
-    get todayLeft() {
-      if (!this.startDate || !this.today) return 0
-      return this.daysBetween(this.startDate, this.today) * this.dayPx
+    occupancyColor(filled, total) {
+      if (total === 0) return 'rgba(34,197,94,0.05)';
+      const ratio = filled / total;
+      if (ratio === 0) return 'rgba(34,197,94,0.05)';
+      if (ratio < 0.5) return 'rgba(34,197,94,0.2)';
+      if (ratio < 1) return 'rgba(34,197,94,0.4)';
+      return 'rgba(34,197,94,0.6)';
     },
 
-    get headerSegments() {
-      if (!this.startDate) return []
-      const segs = []
-      const d = new Date(this.startDate)
-      const segDays = this.zoom === 'week' ? 7 : 30
-
-      while (this.daysBetween(this.startDate, d) < this.windowDays) {
-        const left = this.daysBetween(this.startDate, d) * this.dayPx
-        const label = this.zoom === 'week'
-          ? this.fmtDate(d, 'MMM d')
-          : this.fmtDate(d, 'MMM yyyy')
-        segs.push({ left, width: segDays * this.dayPx, label })
-        d.setDate(d.getDate() + segDays)
+    getAIContext() {
+      const ctx = { view: this.tab };
+      if (this.tab === 'beds' && this.selectedBed) {
+        ctx.bed_name = this.selectedBed.name;
+        ctx.empty_slots = this.selectedBed.empty_count;
+        ctx.current_plants = this.selectedBed.plants;
       }
-      return segs
-    },
-
-    // ── Bar style ──────────────────────────────────────────────────────
-    barStyle(bar) {
-      if (!bar.due_date || !this.startDate) return 'display: none'
-
-      const barDate = new Date(bar.due_date + 'T00:00:00')
-      const left = this.drag.active && this.drag.bar && this.drag.bar.task_id === bar.task_id
-        ? this.drag.currentLeft
-        : this.daysBetween(this.startDate, barDate) * this.dayPx
-
-      const width = Math.max(this.dayPx * 2, 52)  // at least 2-day width for readability
-
-      const bg = bar.color === 'green'  ? '#16a34a'
-               : bar.color === 'amber'  ? '#d97706'
-               :                          '#9ca3af'
-
-      const top = 8
-      const height = 32
-
-      return [
-        `left: ${left}px`,
-        `width: ${width}px`,
-        `top: ${top}px`,
-        `height: ${height}px`,
-        `background: ${bg}`,
-        `border-radius: 6px`,
-        `cursor: ${this.drag.active ? 'grabbing' : 'grab'}`,
-        `user-select: none`,
-        `transition: ${this.drag.active ? 'none' : 'left 0.15s ease'}`
-      ].join('; ')
-    },
-
-    // ── Drag ───────────────────────────────────────────────────────────
-    startDrag(event, bar) {
-      const e = event.touches ? event.touches[0] : event
-      const barDate = bar.due_date ? new Date(bar.due_date + 'T00:00:00') : null
-      if (!barDate) return
-
-      const originalLeft = this.daysBetween(this.startDate, barDate) * this.dayPx
-
-      this.drag = {
-        active: true,
-        bar,
-        originX: e.pageX,
-        originalLeft,
-        currentLeft: originalLeft
+      if (this.tab === 'timeline' && this.expandedBeds.length) {
+        ctx.expanded_beds = this.expandedBeds;
       }
-      // prevent click from firing as a popover-open if we actually drag
-      this._wasDragged = false
+      return ctx;
     },
 
-    onDragMove(event) {
-      if (!this.drag.active) return
-      const e = event.touches ? event.touches[0] : event
-      const delta = e.pageX - this.drag.originX
-      this.drag.currentLeft = Math.max(0, this.drag.originalLeft + delta)
-      if (Math.abs(delta) > 4) this._wasDragged = true
+    selectBed(name, emptyCount, plants) {
+      this.selectedBed = { name, empty_count: emptyCount, plants };
     },
 
-    async endDrag(event) {
-      if (!this.drag.active) return
-      const bar = this.drag.bar
-      const finalLeft = this.drag.currentLeft
-      this.drag.active = false
+    openAIForBed(bedName, emptyCount) {
+      this.selectedBed = { name: bedName, empty_count: emptyCount, plants: [] };
+      if (this.$refs.aiDrawer.showModal) this.$refs.aiDrawer.showModal();
+    },
 
-      if (!this._wasDragged) return  // was a click, not a drag
+    // AI drawer state and methods
+    aiMessages: JSON.parse(document.getElementById('planner-data')?.textContent || '[]'),
+    aiInput: '',
+    aiSending: false,
 
-      // Calculate new date from pixel offset
-      const daysOffset = Math.round(finalLeft / this.dayPx)
-      const newDate = new Date(this.startDate)
-      newDate.setDate(newDate.getDate() + daysOffset)
-      const newDateStr = this.toISODate(newDate)
-
-      // Optimistic update
-      const originalDate = bar.due_date
-      bar.due_date = newDateStr
+    async sendAIMessage() {
+      if (!this.aiInput.trim() || this.aiSending) return;
+      const text = this.aiInput.trim();
+      this.aiInput = '';
+      this.aiMessages.push({ role: 'user', content: text, id: Date.now() });
+      this.aiSending = true;
 
       try {
-        const res = await fetch(`/tasks/${bar.task_id}/reschedule`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `due_date=${encodeURIComponent(newDateStr)}`
-        })
-        if (!res.ok) {
-          bar.due_date = originalDate  // rollback
-          console.error('Reschedule failed', res.status)
-        } else {
-          // Recalculate color
-          const daysUntil = this.daysBetween(this.today, newDate)
-          bar.days_until = daysUntil
-          bar.color = daysUntil <= 0 && bar.status === 'done' ? 'green'
-                    : bar.status === 'done'                   ? 'green'
-                    : daysUntil <= 7                          ? 'amber'
-                    :                                           'gray'
-        }
-      } catch (e) {
-        bar.due_date = originalDate
-        console.error('Reschedule error', e)
-      }
-    },
-
-    // ── Popover ────────────────────────────────────────────────────────
-    openPopover(bar, plan) {
-      if (this._wasDragged) return  // suppress if we just dragged
-      this.popover = { open: true, bar, plan, saving: false }
-    },
-
-    closePopover() {
-      this.popover = { open: false, bar: null, plan: null, saving: false }
-    },
-
-    async markDone(bar) {
-      this.popover.saving = true
-      try {
-        const res = await fetch(`/tasks/${bar.task_id}/complete`, {
+        const context = this.getAIContext();
+        const res = await fetch('/succession/planner/ask', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: ''
-        })
-        if (res.ok || res.status === 302) {
-          bar.status = 'done'
-          bar.color = 'green'
-          this.popover.bar = { ...bar }  // force reactivity
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, context })
+        });
+        const { request_id } = await res.json();
+        await this.pollForAIResponse(request_id);
+      } catch(e) {
+        this.aiMessages.push({ role: 'assistant', content: 'Sorry, something went wrong.', id: Date.now() });
+      }
+      this.aiSending = false;
+    },
+
+    async pollForAIResponse(requestId) {
+      for (let i = 0; i < 60; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        const res = await fetch(`/succession/planner/result/${requestId}`);
+        const data = await res.json();
+        if (data.status === 'done') {
+          this.aiMessages.push({ role: 'assistant', content: data.content, id: Date.now(), draft: data.draft });
+          return;
         }
-      } catch (e) {
-        console.error('Mark done error', e)
-      } finally {
-        this.popover.saving = false
+        if (data.status === 'error') {
+          this.aiMessages.push({ role: 'assistant', content: data.error || 'Planning failed.', id: Date.now() });
+          return;
+        }
       }
     },
 
-    // ── Helpers ────────────────────────────────────────────────────────
-    daysBetween(a, b) {
-      const msPerDay = 86400000
-      const aUTC = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())
-      const bUTC = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())
-      return Math.round((bUTC - aUTC) / msPerDay)
-    },
-
-    toISODate(d) {
-      const y = d.getFullYear()
-      const m = String(d.getMonth() + 1).padStart(2, '0')
-      const day = String(d.getDate()).padStart(2, '0')
-      return `${y}-${m}-${day}`
-    },
-
-    fmtDate(d, fmt) {
-      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-      if (fmt === 'MMM d')    return `${months[d.getMonth()]} ${d.getDate()}`
-      if (fmt === 'MMM yyyy') return `${months[d.getMonth()]} ${d.getFullYear()}`
-      return d.toDateString()
+    sendQuickAction(text) {
+      this.aiInput = text;
+      this.sendAIMessage();
     }
   }
 }
