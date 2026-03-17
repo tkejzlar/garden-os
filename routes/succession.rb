@@ -3,19 +3,19 @@ require_relative "../models/task"
 
 class GardenApp
   get "/succession" do
-    @plans = SuccessionPlan.all
+    @plans = SuccessionPlan.where(garden_id: @current_garden.id).all
     require_relative "../models/planner_message"
-    @planner_messages = PlannerMessage.order(:created_at).all
+    @planner_messages = PlannerMessage.where(garden_id: @current_garden.id).order(:created_at).all
     erb :succession
   end
 
   get "/api/succession/gantt" do
     today = Date.today
 
-    plans = SuccessionPlan.all.map do |sp|
+    plans = SuccessionPlan.where(garden_id: @current_garden.id).all.map do |sp|
       # Fetch all sow tasks whose title contains the crop name, ordered by due_date
       sow_tasks = Task
-        .where(task_type: "sow")
+        .where(garden_id: @current_garden.id, task_type: "sow")
         .where(Sequel.like(:title, "%#{sp.crop}%"))
         .order(:due_date)
         .all
@@ -58,11 +58,11 @@ class GardenApp
   end
 
   get "/api/succession" do
-    plans = SuccessionPlan.all.map do |sp|
-      completed = Task.where(task_type: "sow")
+    plans = SuccessionPlan.where(garden_id: @current_garden.id).all.map do |sp|
+      completed = Task.where(garden_id: @current_garden.id, task_type: "sow")
                       .where(Sequel.like(:title, "%#{sp.crop}%"))
                       .where(status: "done").count
-      upcoming = Task.where(task_type: "sow")
+      upcoming = Task.where(garden_id: @current_garden.id, task_type: "sow")
                      .where(Sequel.like(:title, "%#{sp.crop}%"))
                      .exclude(status: "done").first
 
@@ -184,6 +184,7 @@ class GardenApp
     halt 400, json(error: "message required") if message.empty?
 
     require_relative "../services/planner_service"
+    Thread.current[:current_garden_id] = @current_garden.id
     service = PlannerService.new
     result = service.send_message(message)
 
@@ -218,9 +219,12 @@ class GardenApp
     request_id = SecureRandom.hex(8)
     PLANNER_MUTEX.synchronize { PLANNER_RESULTS[request_id] = { status: "pending" } }
 
+    garden_id = @current_garden.id
+
     # AI runs in background thread — result stored when done
     Thread.new do
       begin
+        Thread.current[:current_garden_id] = garden_id
         GardenLogger.info "[Planner/Async] Starting #{request_id}"
         service = PlannerService.new
         result = service.send_message(message)
@@ -266,7 +270,7 @@ class GardenApp
 
   delete "/succession/planner/messages" do
     require_relative "../models/planner_message"
-    PlannerMessage.dataset.delete
+    PlannerMessage.where(garden_id: @current_garden.id).delete
     json(success: true)
   end
 end

@@ -23,13 +23,14 @@ class GardenApp
   end
 
   get "/api/tasks" do
-    tasks = Task.exclude(status: "done")
+    tasks = Task.where(garden_id: @current_garden.id)
+                .exclude(status: "done")
                 .order(:due_date).all
     json tasks.map(&:values)
   end
 
   get "/api/tasks/today" do
-    tasks = Task.where(due_date: Date.today)
+    tasks = Task.where(garden_id: @current_garden.id, due_date: Date.today)
                 .exclude(status: "done").all
     json tasks.map(&:values)
   end

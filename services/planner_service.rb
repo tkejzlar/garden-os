@@ -24,11 +24,14 @@ class PlannerService
   def initialize
     @last_draft = nil
     @tool_calls = []
+    @garden_id = Thread.current[:current_garden_id]
   end
 
   def system_prompt
+    garden = @garden_id ? (require_relative "../models/garden"; Garden.first(id: @garden_id)) : nil
+    garden_name = garden&.name || "the garden"
     <<~PROMPT
-      You are a garden planning consultant for a productive vegetable garden in Prague,
+      You are a garden planning consultant for #{garden_name}, a productive vegetable garden in Prague,
       Czech Republic (zone 6b/7a, last frost ~May 13, first frost ~Oct 15, continental climate).
 
       ALWAYS use the available tools to look up the garden's actual data before making
@@ -86,8 +89,8 @@ class PlannerService
         @tool_calls << { name: name, at: Time.now.iso8601 }
       end
 
-      # Replay conversation history
-      history = PlannerMessage.order(:created_at).all
+      # Replay conversation history (scoped to current garden if available)
+      history = (@garden_id ? PlannerMessage.where(garden_id: @garden_id) : PlannerMessage).order(:created_at).all
       GardenLogger.info "[Planner] Replaying #{history.length} messages from history"
       history.each do |msg|
         c.add_message(role: msg.role.to_sym, content: msg.content)
@@ -99,7 +102,7 @@ class PlannerService
 
   def send_message(user_text)
     GardenLogger.info "[Planner] User message: #{user_text.slice(0, 100)}..."
-    PlannerMessage.create(role: "user", content: user_text, created_at: Time.now)
+    PlannerMessage.create(garden_id: @garden_id, role: "user", content: user_text, created_at: Time.now)
 
     Thread.current[:planner_draft] = nil
     @tool_calls = []
@@ -131,6 +134,7 @@ class PlannerService
     end
 
     PlannerMessage.create(
+      garden_id: @garden_id,
       role: "assistant",
       content: content,
       draft_payload: @last_draft ? JSON.generate(@last_draft) : nil,
@@ -155,14 +159,14 @@ class PlannerService
       }
     )
 
-    PlannerMessage.create(role: "assistant", content: "Sorry, I encountered an error. Please try again.", created_at: Time.now)
+    PlannerMessage.create(garden_id: @garden_id, role: "assistant", content: "Sorry, I encountered an error. Please try again.", created_at: Time.now)
     { content: "Sorry, I encountered an error: #{e.message}", draft: nil, tool_calls: @tool_calls }
   end
 
   # Streaming version — yields chunks as they arrive
   def send_message_streaming(user_text, &block)
     GardenLogger.info "[Planner/Stream] User message: #{user_text.slice(0, 100)}..."
-    PlannerMessage.create(role: "user", content: user_text, created_at: Time.now)
+    PlannerMessage.create(garden_id: @garden_id, role: "user", content: user_text, created_at: Time.now)
 
     Thread.current[:planner_draft] = nil
     @tool_calls = []
@@ -188,6 +192,7 @@ class PlannerService
 
     # Save to DB
     PlannerMessage.create(
+      garden_id: @garden_id,
       role: "assistant",
       content: full_content.empty? ? "I couldn't generate a response." : full_content,
       draft_payload: @last_draft ? JSON.generate(@last_draft) : nil,
@@ -209,7 +214,7 @@ class PlannerService
     )
 
     block.call({ type: "error", content: "Error: #{e.message}" }) if block
-    PlannerMessage.create(role: "assistant", content: "Sorry, I encountered an error.", created_at: Time.now)
+    PlannerMessage.create(garden_id: @garden_id, role: "assistant", content: "Sorry, I encountered an error.", created_at: Time.now)
     { content: "Error: #{e.message}", draft: nil, tool_calls: @tool_calls }
   end
 end

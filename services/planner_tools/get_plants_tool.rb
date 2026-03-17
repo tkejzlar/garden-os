@@ -5,7 +5,9 @@ class GetPlantsTool < RubyLLM::Tool
   description "Get all active plants currently being grown — variety, stage, location, days in stage"
 
   def execute
-    plants = Plant.exclude(lifecycle_stage: "done").all.map do |p|
+    garden_id = Thread.current[:current_garden_id]
+    base = garden_id ? Plant.where(garden_id: garden_id) : Plant
+    plants = base.exclude(lifecycle_stage: "done").all.map do |p|
       slot = p.slot
       row = slot&.row
       bed = row&.bed

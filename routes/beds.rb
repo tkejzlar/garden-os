@@ -14,9 +14,9 @@ class GardenApp
   # ── Garden designer page ─────────────────────────────────────────────────────
 
   get "/garden" do
-    @beds = Bed.all
-    @arches = Arch.all
-    @indoor_stations = IndoorStation.all
+    @beds = Bed.where(garden_id: @current_garden.id).all
+    @arches = Arch.where(garden_id: @current_garden.id).all
+    @indoor_stations = IndoorStation.where(garden_id: @current_garden.id).all
 
     # Build full bed data for the plant overlay (same query as the old /beds page)
     @bed_data = @beds.map do |bed|
@@ -54,7 +54,7 @@ class GardenApp
   # ── Existing beds JSON API (preserved) ───────────────────────────────────────
 
   get "/api/beds" do
-    beds = Bed.all.map do |bed|
+    beds = Bed.where(garden_id: @current_garden.id).all.map do |bed|
       rows = Row.where(bed_id: bed.id).order(:position).all.map do |row|
         slots = Slot.where(row_id: row.id).order(:position).all.map do |slot|
           plant = Plant.where(slot_id: slot.id).exclude(lifecycle_stage: "done").first

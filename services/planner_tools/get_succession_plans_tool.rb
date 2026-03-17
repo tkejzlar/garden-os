@@ -6,8 +6,11 @@ class GetSuccessionPlansTool < RubyLLM::Tool
   description "Get existing succession planting schedules with their completion status"
 
   def execute
-    plans = SuccessionPlan.all.map do |sp|
-      completed = Task.where(task_type: "sow")
+    garden_id = Thread.current[:current_garden_id]
+    base = garden_id ? SuccessionPlan.where(garden_id: garden_id) : SuccessionPlan
+    plans = base.all.map do |sp|
+      task_base = garden_id ? Task.where(garden_id: garden_id, task_type: "sow") : Task.where(task_type: "sow")
+      completed = task_base
                       .where(Sequel.like(:title, "%#{sp.crop}%"))
                       .where(status: "done").count
       {

@@ -6,8 +6,8 @@ require_relative "../models/photo"
 
 class GardenApp
   get "/plants" do
-    @plants = Plant.exclude(lifecycle_stage: "done").order(:crop_type, :variety_name).all
-    @done_plants = Plant.where(lifecycle_stage: "done").all
+    @plants = Plant.where(garden_id: @current_garden.id).exclude(lifecycle_stage: "done").order(:crop_type, :variety_name).all
+    @done_plants = Plant.where(garden_id: @current_garden.id, lifecycle_stage: "done").all
     erb :"plants/index"
   end
 
@@ -92,7 +92,7 @@ class GardenApp
   end
 
   get "/api/plants" do
-    json Plant.exclude(lifecycle_stage: "done").all.map(&:values)
+    json Plant.where(garden_id: @current_garden.id).exclude(lifecycle_stage: "done").all.map(&:values)
   end
 
   get "/api/plants/:id" do

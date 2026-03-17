@@ -8,18 +8,18 @@ require_relative "../services/sensor_service"
 
 class GardenApp
   get "/" do
-    @today_tasks = Task.where(due_date: Date.today)
+    @today_tasks = Task.where(garden_id: @current_garden.id, due_date: Date.today)
                        .exclude(status: "done")
                        .order(:priority).all
 
-    @upcoming_tasks = Task.where(due_date: (Date.today + 1)..(Date.today + 7))
+    @upcoming_tasks = Task.where(garden_id: @current_garden.id, due_date: (Date.today + 1)..(Date.today + 7))
                           .exclude(status: "done")
                           .order(:due_date).all
 
-    @germination_watch = Plant.where(lifecycle_stage: %w[germinating sown_indoor])
+    @germination_watch = Plant.where(garden_id: @current_garden.id, lifecycle_stage: %w[germinating sown_indoor])
                               .all
 
-    @advisories = Advisory.where(date: Date.today).all
+    @advisories = Advisory.where(garden_id: @current_garden.id, date: Date.today).all
 
     @weather = WeatherService.fetch_current
 

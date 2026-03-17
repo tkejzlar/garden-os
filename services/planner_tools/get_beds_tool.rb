@@ -6,7 +6,8 @@ class GetBedsTool < RubyLLM::Tool
   description "Get all garden beds with dimensions, rows, slots, and which plants are currently assigned to each slot"
 
   def execute
-    beds = Bed.all.map do |bed|
+    garden_id = Thread.current[:current_garden_id]
+    beds = (garden_id ? Bed.where(garden_id: garden_id) : Bed).all.map do |bed|
       rows = Row.where(bed_id: bed.id).order(:position).all.map do |row|
         slots = Slot.where(row_id: row.id).order(:position).all.map do |slot|
           plant = Plant.where(slot_id: slot.id).exclude(lifecycle_stage: "done").first
@@ -55,8 +56,8 @@ class GetBedsTool < RubyLLM::Tool
     end
 
     # Also include arches and indoor stations
-    arches = Arch.all.map { |a| { name: a.name, between_beds: a.between_beds, spring_crop: a.spring_crop, summer_crop: a.summer_crop } }
-    indoor = IndoorStation.all.map { |s| { name: s.name, type: s.station_type, target_temp: s.target_temp } }
+    arches = (garden_id ? Arch.where(garden_id: garden_id) : Arch).all.map { |a| { name: a.name, between_beds: a.between_beds, spring_crop: a.spring_crop, summer_crop: a.summer_crop } }
+    indoor = (garden_id ? IndoorStation.where(garden_id: garden_id) : IndoorStation).all.map { |s| { name: s.name, type: s.station_type, target_temp: s.target_temp } }
 
     JSON.generate({ beds: beds, arches: arches, indoor_stations: indoor })
   end
