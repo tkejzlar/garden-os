@@ -35,6 +35,7 @@
           debounceTimer: null,
           loading: false,
           catalogMatch: null,
+          highlightIndex: -1,
 
           onInput() {
             clearTimeout(this.debounceTimer);
@@ -106,7 +107,13 @@
       <label class="block text-xs font-medium mb-1" style="color: var(--gray-500);">Variety name *</label>
       <div class="relative">
         <input type="text" name="variety_name" x-model="query" required
-               @input="onInput()" @focus="onInput()" @blur="dismissSuggestions()"
+               @input="onInput(); highlightIndex = -1"
+               @focus="onInput()"
+               @blur="dismissSuggestions()"
+               @keydown.arrow-down.prevent="if (showSuggestions) highlightIndex = Math.min(highlightIndex + 1, Math.min(suggestions.length, 6) - 1)"
+               @keydown.arrow-up.prevent="if (showSuggestions) highlightIndex = Math.max(highlightIndex - 1, 0)"
+               @keydown.enter.prevent="if (showSuggestions && highlightIndex >= 0) { selectSuggestion(suggestions[highlightIndex]); } else { $el.closest('form').requestSubmit(); }"
+               @keydown.escape="showSuggestions = false; highlightIndex = -1"
                autocomplete="off" autofocus
                class="w-full rounded-lg px-3 py-2.5 text-sm border"
                style="border-color: #e5e7eb;">
@@ -122,10 +129,11 @@
       <div x-show="showSuggestions && suggestions.length > 0" x-transition
            class="absolute left-0 right-0 mt-1 rounded-lg overflow-hidden z-50"
            style="background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.12); border: 1px solid #e5e7eb;">
-        <template x-for="s in suggestions.slice(0, 6)" :key="s.name + s.supplier">
+        <template x-for="(s, idx) in suggestions.slice(0, 6)" :key="s.name + s.supplier">
           <button type="button" @mousedown.prevent="selectSuggestion(s)"
-                  class="w-full text-left px-3 py-2.5 text-sm flex items-center justify-between hover:bg-gray-50 border-b last:border-0"
-                  style="border-color: #f3f4f6;">
+                  @mouseenter="highlightIndex = idx"
+                  class="w-full text-left px-3 py-2.5 text-sm flex items-center justify-between border-b last:border-0"
+                  :style="'border-color: #f3f4f6;' + (highlightIndex === idx ? 'background: #f0fdf4;' : '')">
             <div>
               <span x-text="s.name" class="font-medium" style="color: var(--text-primary);"></span>
               <span class="ml-1.5 capitalize" style="color: var(--text-secondary);" x-text="s.crop_type"></span>

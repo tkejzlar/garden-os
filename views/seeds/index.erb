@@ -1,10 +1,10 @@
 <!-- Page Header -->
-<div class="flex items-center justify-between mb-6">
+<div class="flex items-center justify-between mb-6" x-data @keydown.window="if (($event.metaKey || $event.ctrlKey) && $event.key === 'n') { $event.preventDefault(); window.location = '/seeds/new'; }">
   <h1 class="text-2xl font-bold" style="color: var(--text-primary)">Seeds</h1>
   <a href="/seeds/new"
      class="text-sm px-3 py-1.5 rounded-lg font-medium"
      style="background: var(--green-900); color: white;">
-    + Add
+    Add seed
   </a>
 </div>
 
