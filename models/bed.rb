@@ -2,6 +2,7 @@ require_relative "../config/database"
 require "json"
 
 class Bed < Sequel::Model
+  many_to_one :garden
   one_to_many :rows
 
   # Returns parsed [[x,y],…] array, or [] when the bed is a rectangle / unplaced.
@@ -35,6 +36,10 @@ class Slot < Sequel::Model
   one_to_many :plants
 end
 
-class Arch < Sequel::Model; end
+class Arch < Sequel::Model
+  many_to_one :garden
+end
 
-class IndoorStation < Sequel::Model; end
+class IndoorStation < Sequel::Model
+  many_to_one :garden
+end

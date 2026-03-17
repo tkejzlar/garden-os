@@ -1,6 +1,8 @@
 require_relative "../config/database"
 
 class SuccessionPlan < Sequel::Model
+  many_to_one :garden
+
   def varieties_list
     varieties ? JSON.parse(varieties) : []
   end

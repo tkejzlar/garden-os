@@ -21,6 +21,21 @@ class GardenApp < Sinatra::Base
     also_reload "services/*.rb"
   end
 
+  before do
+    require_relative "models/garden"
+    garden_id = request.cookies["garden_id"]&.to_i
+    @current_garden = (garden_id && Garden[garden_id]) || Garden.first
+    @gardens = Garden.order(:name).all
+  end
+
+  post "/gardens/switch/:id" do
+    require_relative "models/garden"
+    garden = Garden[params[:id].to_i]
+    halt 404 unless garden
+    response.set_cookie("garden_id", value: garden.id.to_s, path: "/", httponly: true, same_site: :lax)
+    redirect back
+  end
+
   get "/health" do
     json status: "ok"
   end

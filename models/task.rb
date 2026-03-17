@@ -1,6 +1,7 @@
 require_relative "../config/database"
 
 class Task < Sequel::Model
+  many_to_one :garden
   many_to_many :plants, join_table: :tasks_plants
   many_to_many :beds, join_table: :tasks_beds
 
