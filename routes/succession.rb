@@ -8,6 +8,25 @@ class GardenApp
     @planner_messages = PlannerMessage.where(garden_id: @current_garden.id).order(:created_at).all
     @all_tasks = Task.where(garden_id: @current_garden.id).exclude(status: "done").order(:due_date).all
     @done_tasks = Task.where(garden_id: @current_garden.id, status: "done").order(Sequel.desc(:completed_at)).limit(10).all
+
+    today = Date.today
+    week_end = today + 7
+
+    @overdue_count = Task.where(garden_id: @current_garden.id)
+      .exclude(status: %w[done skipped])
+      .where { due_date < today }
+      .count
+
+    @due_this_week_count = Task.where(garden_id: @current_garden.id)
+      .exclude(status: %w[done skipped])
+      .where(due_date: today..week_end)
+      .count
+
+    @done_count = Task.where(garden_id: @current_garden.id, status: "done").count
+    @total_task_count = Task.where(garden_id: @current_garden.id).count
+    @total_plants = Plant.where(garden_id: @current_garden.id).count
+    @succession_count = SuccessionPlan.where(garden_id: @current_garden.id).count
+
     erb :succession
   end
 
