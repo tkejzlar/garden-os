@@ -60,4 +60,34 @@ class TestSuccession < GardenTest
     body = JSON.parse(last_response.body)
     assert_equal "Lettuce", body.first["crop"]
   end
+
+  def test_bed_timeline_api
+    bed = Bed.create(garden_id: @garden.id, name: "BB1")
+    row = Row.create(bed_id: bed.id, name: "R1", position: 1)
+    slot = Slot.create(row_id: row.id, name: "S1", position: 1)
+
+    plant = Plant.create(
+      garden_id: @garden.id,
+      slot_id: slot.id,
+      variety_name: "Raf",
+      crop_type: "tomato",
+      lifecycle_stage: "planted_out",
+      sow_date: Date.today - 30
+    )
+
+    get "/api/plan/bed-timeline"
+    assert_equal 200, last_response.status
+
+    data = JSON.parse(last_response.body)
+    assert_equal Date.today.to_s, data["today"]
+    assert data["beds"].is_a?(Array)
+    assert_equal 1, data["beds"].length
+
+    bed_data = data["beds"].first
+    assert_equal "BB1", bed_data["bed_name"]
+    assert_equal 1, bed_data["total_slots"]
+    assert bed_data["occupancy"].is_a?(Array)
+    assert bed_data["crops"].is_a?(Array)
+    assert_equal "tomato", bed_data["crops"].first["crop"]
+  end
 end

@@ -78,6 +78,94 @@ class GardenApp
     json({ today: today.to_s, plans: plans })
   end
 
+  get "/api/plan/bed-timeline" do
+    content_type :json
+    today = Date.today
+
+    earliest = Task.where(garden_id: @current_garden.id).min(:due_date)
+    latest = Task.where(garden_id: @current_garden.id).max(:due_date)
+    plan_starts = SuccessionPlan.where(garden_id: @current_garden.id).min(:season_start)
+    plan_ends = SuccessionPlan.where(garden_id: @current_garden.id).max(:season_end)
+
+    season_start = [earliest, plan_starts, today].compact.min - 14
+    season_end = [latest, plan_ends, today + 180].compact.max + 14
+
+    months = []
+    d = Date.new(season_start.year, season_start.month, 1)
+    while d <= season_end
+      months << d.strftime("%Y-%m")
+      d = d >> 1
+    end
+
+    beds = Bed.where(garden_id: @current_garden.id).all.map do |bed|
+      rows = bed.rows
+      slots = rows.flat_map(&:slots)
+      total_slots = slots.count
+
+      plants = slots.flat_map(&:plants).reject { |p| p.lifecycle_stage == "done" }
+
+      occupancy = months.map do |month_str|
+        year, month = month_str.split("-").map(&:to_i)
+        month_start = Date.new(year, month, 1)
+        month_end = (month_start >> 1) - 1
+
+        filled = slots.count do |slot|
+          slot.plants.any? do |plant|
+            start_date = plant.sow_date || plant.created_at&.to_date || today
+            end_date = plant.lifecycle_stage == "done" ? (plant.updated_at&.to_date || today) : season_end
+            start_date <= month_end && end_date >= month_start
+          end
+        end
+
+        { month: month_str, filled: filled }
+      end
+
+      crops_grouped = plants.group_by(&:crop_type)
+
+      crops = crops_grouped.map do |crop, crop_plants|
+        varieties = crop_plants.map(&:variety_name).uniq
+        start_date = crop_plants.map { |p| p.sow_date || p.created_at&.to_date }.compact.min
+        {
+          crop: crop,
+          varieties: varieties,
+          plant_count: crop_plants.count,
+          periods: [{
+            start: start_date&.to_s,
+            end: nil,
+            status: crop_plants.any? { |p| %w[planted_out producing].include?(p.lifecycle_stage) } ? "planted" : "growing"
+          }]
+        }
+      end
+
+      SuccessionPlan.where(garden_id: @current_garden.id).all.each do |plan|
+        next unless plan.target_beds_list.include?(bed.name)
+        existing_tasks = Task.where(garden_id: @current_garden.id, task_type: "sow", status: "done")
+          .where(Sequel.like(:title, "%#{plan.crop}%")).count
+
+        (existing_tasks...plan.total_planned_sowings).each do |i|
+          sow_date = plan.next_sowing_date(i)
+          next unless sow_date
+          crops << {
+            crop: plan.crop,
+            varieties: plan.varieties_list,
+            plant_count: 1,
+            periods: [{ start: sow_date.to_s, end: nil, status: "planned" }]
+          }
+        end
+      end
+
+      {
+        bed_id: bed.id,
+        bed_name: bed.name,
+        total_slots: total_slots,
+        occupancy: occupancy,
+        crops: crops
+      }
+    end
+
+    { today: today.to_s, season_start: season_start.to_s, season_end: season_end.to_s, beds: beds }.to_json
+  end
+
   get "/api/succession" do
     plans = SuccessionPlan.where(garden_id: @current_garden.id).all.map do |sp|
       completed = Task.where(garden_id: @current_garden.id, task_type: "sow")
