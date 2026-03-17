@@ -244,7 +244,7 @@
 <!-- ── Beds Tab Panel ── -->
 <div x-show="tab === 'beds'" style="padding: 12px 16px;">
   <%
-    beds = Bed.where(garden_id: @current_garden.id).eager(rows: {slots: :plants}).all
+    beds = Bed.where(garden_id: @current_garden.id).eager(:plants).all
     arches = Arch.where(garden_id: @current_garden.id).all
     stations = IndoorStation.where(garden_id: @current_garden.id).all
   %>
@@ -253,10 +253,10 @@
     <!-- Occupancy summary pills -->
     <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;">
       <% beds.each do |bed| %>
-        <% slots = bed.rows.flat_map(&:slots); filled = slots.count { |s| s.plants.any? { |p| p.lifecycle_stage != "done" } } %>
+        <% active = bed.plants.count { |p| p.lifecycle_stage != "done" }; total = bed.grid_cols * bed.grid_rows %>
         <div style="padding: 4px 10px; background: var(--card-bg); border-radius: 8px; font-size: 11px; box-shadow: var(--card-shadow);">
           <span style="font-weight: 600; color: var(--green-900);"><%= bed.name %></span>
-          <span style="color: var(--text-secondary);"><%= filled %>/<%= slots.count %></span>
+          <span style="color: var(--text-secondary);"><%= active %>/<%= total %></span>
         </div>
       <% end %>
     </div>
@@ -266,10 +266,11 @@
     <div style="font-size: 10px; font-weight: 600; color: var(--green-900); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Outdoor Beds</div>
     <% beds.each do |bed| %>
       <%
-        rows = bed.rows.sort_by(&:position)
-        all_slots = rows.flat_map(&:slots)
-        total_slots = all_slots.count
-        filled = all_slots.count { |s| s.plants.any? { |p| p.lifecycle_stage != "done" } }
+        active_plants = bed.plants.reject { |p| p.lifecycle_stage == "done" }
+        gcols = bed.grid_cols
+        grows = bed.grid_rows
+        total_cells = gcols * grows
+        filled = active_plants.count
         bed_w = (bed.width || 100).to_f
         bed_l = (bed.length || 100).to_f
         is_polygon = bed.polygon?
@@ -282,109 +283,70 @@
           <div>
             <div style="font-size: 14px; font-weight: 600; color: var(--green-900);"><%= bed.name %></div>
             <div style="font-size: 10px; color: var(--text-secondary);">
-              <%= bed_w.round %>×<%= bed_l.round %>cm · <%= rows.count %> rows · <%= total_slots %> slots
+              <%= bed_w.round %>×<%= bed_l.round %>cm · <%= gcols %>×<%= grows %> grid
             </div>
           </div>
-          <div style="font-size: 12px; font-weight: 600; color: var(--green-900);"><%= filled %>/<%= total_slots %> <span style="font-weight: 400; color: var(--text-secondary);">filled</span></div>
+          <div style="font-size: 12px; font-weight: 600; color: var(--green-900);"><%= filled %>/<%= total_cells %> <span style="font-weight: 400; color: var(--text-secondary);">filled</span></div>
         </div>
 
-        <!-- SVG Bed -->
-        <% if is_polygon %>
-          <%
-            points = bed.canvas_points_array
-            xs = points.map { |p| p[0] }
-            ys = points.map { |p| p[1] }
-            min_x, max_x = xs.min, xs.max
-            min_y, max_y = ys.min, ys.max
-            vw = max_x - min_x
-            vh = max_y - min_y
-            svg_points = points.map { |p| "#{p[0] - min_x},#{p[1] - min_y}" }.join(" ")
-          %>
-          <svg viewBox="0 0 <%= vw %> <%= vh %>" style="width: 100%; max-height: 300px; min-height: 80px;" preserveAspectRatio="xMidYMid meet">
-            <!-- Bed outline -->
-            <polygon points="<%= svg_points %>" fill="<%= fill_color %>" fill-opacity="0.3" stroke="<%= fill_color %>" stroke-width="2" rx="4"/>
+        <!-- SVG Bed (grid-based) -->
+        <%
+          padding = 6
+          svg_w = bed_w; svg_h = bed_l
+          cell_w = (svg_w - padding * 2).to_f / gcols
+          cell_h = (svg_h - padding * 2).to_f / grows
+          # Build a lookup from (grid_x, grid_y) -> plant
+          plant_map = {}
+          active_plants.each { |p| plant_map[[p.grid_x.to_i, p.grid_y.to_i]] = p }
+        %>
+        <svg viewBox="0 0 <%= svg_w %> <%= svg_h %>" style="width: 100%; max-height: 300px; min-height: 80px;" preserveAspectRatio="xMidYMid meet">
+          <!-- Bed outline -->
+          <% if is_polygon %>
+            <%
+              pts = bed.canvas_points_array
+              xs = pts.map { |p| p[0] }; ys = pts.map { |p| p[1] }
+              min_x, max_x = xs.min, xs.max; min_y, max_y = ys.min, ys.max
+              svg_pts = pts.map { |p| "#{p[0] - min_x},#{p[1] - min_y}" }.join(" ")
+            %>
+            <polygon points="<%= svg_pts %>" fill="<%= fill_color %>" fill-opacity="0.3" stroke="<%= fill_color %>" stroke-width="2"/>
+          <% else %>
+            <rect x="0" y="0" width="<%= svg_w %>" height="<%= svg_h %>" rx="4" fill="<%= fill_color %>" fill-opacity="0.3" stroke="<%= fill_color %>" stroke-width="2"/>
+          <% end %>
 
-            <!-- Slots grid inside bounding box -->
-            <% padding = 8; slot_rows = rows.count; max_cols = rows.map { |r| r.slots.count }.max %>
-            <% cell_w = (vw - padding * 2).to_f / max_cols; cell_h = (vh - padding * 2).to_f / slot_rows %>
-            <% rows.each_with_index do |row, ri| %>
-              <% row.slots.sort_by(&:position).each_with_index do |slot, ci| %>
-                <%
-                  sx = padding + ci * cell_w + 2
-                  sy = padding + ri * cell_h + 2
-                  sw = cell_w - 4
-                  sh = cell_h - 4
-                  plant = slot.plants.find { |p| p.lifecycle_stage != "done" }
-                  slot_fill = if plant
-                    case plant.crop_type.to_s.downcase
-                    when 'tomato', 'pepper', 'eggplant' then '#fecaca'
-                    when 'lettuce', 'spinach', 'chard', 'kale' then '#bbf7d0'
-                    when 'herb', 'basil' then '#a7f3d0'
-                    when 'flower' then '#fef08a'
-                    when 'cucumber', 'squash', 'melon', 'zucchini' then '#bae6fd'
-                    else '#e5e7eb'
-                    end
-                  else
-                    '#f9fafb'
+          <!-- Grid cells -->
+          <% grows.times do |ri| %>
+            <% gcols.times do |ci| %>
+              <%
+                sx = padding + ci * cell_w + 2
+                sy = padding + ri * cell_h + 2
+                sw = cell_w - 4
+                sh = cell_h - 4
+                plant = plant_map[[ci, ri]]
+                slot_fill = if plant
+                  case plant.crop_type.to_s.downcase
+                  when 'tomato', 'pepper', 'eggplant' then '#fecaca'
+                  when 'lettuce', 'spinach', 'chard', 'kale' then '#bbf7d0'
+                  when 'herb', 'basil' then '#a7f3d0'
+                  when 'flower' then '#fef08a'
+                  when 'cucumber', 'squash', 'melon', 'zucchini' then '#bae6fd'
+                  else '#e5e7eb'
                   end
-                %>
-                <% if plant %>
-                  <a href="/plants/<%= plant.id %>" style="cursor: pointer;">
-                    <rect x="<%= sx %>" y="<%= sy %>" width="<%= sw %>" height="<%= sh %>" rx="4" fill="<%= slot_fill %>" stroke="#d1d5db" stroke-width="1"/>
-                    <text x="<%= sx + sw/2 %>" y="<%= sy + sh/2 - 4 %>" text-anchor="middle" font-size="<%= [sh * 0.22, 11].min %>" font-weight="500" fill="#1a2e05"><%= plant.variety_name.length > 10 ? plant.variety_name[0..8] + '...' : plant.variety_name %></text>
-                    <text x="<%= sx + sw/2 %>" y="<%= sy + sh/2 + 8 %>" text-anchor="middle" font-size="<%= [sh * 0.16, 9].min %>" fill="#6b7280"><%= plant.lifecycle_stage.tr('_', ' ') %></text>
-                  </a>
-                <% else %>
-                  <rect x="<%= sx %>" y="<%= sy %>" width="<%= sw %>" height="<%= sh %>" rx="4" fill="<%= slot_fill %>" stroke="#d1d5db" stroke-width="1" stroke-dasharray="4,2" @click="openAIForBed('<%= bed.name %>', <%= all_slots.count { |s| s.plants.none? { |p| p.lifecycle_stage != 'done' } } %>)" style="cursor: pointer;"/>
-                <% end %>
+                else
+                  '#f9fafb'
+                end
+              %>
+              <% if plant %>
+                <a href="/plants/<%= plant.id %>" style="cursor: pointer;">
+                  <rect x="<%= sx %>" y="<%= sy %>" width="<%= sw %>" height="<%= sh %>" rx="4" fill="<%= slot_fill %>" stroke="#d1d5db" stroke-width="1"/>
+                  <text x="<%= sx + sw/2 %>" y="<%= sy + sh/2 - 4 %>" text-anchor="middle" font-size="<%= [sh * 0.22, 11].min %>" font-weight="500" fill="#1a2e05"><%= plant.variety_name.length > 10 ? plant.variety_name[0..8] + '...' : plant.variety_name %></text>
+                  <text x="<%= sx + sw/2 %>" y="<%= sy + sh/2 + 8 %>" text-anchor="middle" font-size="<%= [sh * 0.16, 9].min %>" fill="#6b7280"><%= plant.lifecycle_stage.tr('_', ' ') %></text>
+                </a>
+              <% else %>
+                <rect x="<%= sx %>" y="<%= sy %>" width="<%= sw %>" height="<%= sh %>" rx="4" fill="<%= slot_fill %>" stroke="#d1d5db" stroke-width="1" stroke-dasharray="4,2" @click="openAIForBed('<%= bed.name %>', <%= total_cells - filled %>)" style="cursor: pointer;"/>
               <% end %>
             <% end %>
-          </svg>
-        <% else %>
-          <!-- Rectangular bed -->
-          <svg viewBox="0 0 <%= bed_w %> <%= bed_l %>" style="width: 100%; max-height: 300px; min-height: 80px;" preserveAspectRatio="xMidYMid meet">
-            <!-- Bed outline -->
-            <rect x="0" y="0" width="<%= bed_w %>" height="<%= bed_l %>" rx="4" fill="<%= fill_color %>" fill-opacity="0.3" stroke="<%= fill_color %>" stroke-width="2"/>
-
-            <!-- Slots grid -->
-            <% padding = 6; slot_rows = rows.count; max_cols = rows.map { |r| r.slots.count }.max %>
-            <% cell_w = (bed_w - padding * 2).to_f / max_cols; cell_h = (bed_l - padding * 2).to_f / slot_rows %>
-            <% rows.each_with_index do |row, ri| %>
-              <% cols_in_row = row.slots.count %>
-              <% row_cell_w = (bed_w - padding * 2).to_f / cols_in_row %>
-              <% row.slots.sort_by(&:position).each_with_index do |slot, ci| %>
-                <%
-                  sx = padding + ci * row_cell_w + 2
-                  sy = padding + ri * cell_h + 2
-                  sw = row_cell_w - 4
-                  sh = cell_h - 4
-                  plant = slot.plants.find { |p| p.lifecycle_stage != "done" }
-                  slot_fill = if plant
-                    case plant.crop_type.to_s.downcase
-                    when 'tomato', 'pepper', 'eggplant' then '#fecaca'
-                    when 'lettuce', 'spinach', 'chard', 'kale' then '#bbf7d0'
-                    when 'herb', 'basil' then '#a7f3d0'
-                    when 'flower' then '#fef08a'
-                    when 'cucumber', 'squash', 'melon', 'zucchini' then '#bae6fd'
-                    else '#e5e7eb'
-                    end
-                  else
-                    '#f9fafb'
-                  end
-                %>
-                <% if plant %>
-                  <a href="/plants/<%= plant.id %>" style="cursor: pointer;">
-                    <rect x="<%= sx %>" y="<%= sy %>" width="<%= sw %>" height="<%= sh %>" rx="4" fill="<%= slot_fill %>" stroke="#d1d5db" stroke-width="1"/>
-                    <text x="<%= sx + sw/2 %>" y="<%= sy + sh/2 - 4 %>" text-anchor="middle" font-size="<%= [sh * 0.22, 11].min %>" font-weight="500" fill="#1a2e05"><%= plant.variety_name.length > 10 ? plant.variety_name[0..8] + '...' : plant.variety_name %></text>
-                    <text x="<%= sx + sw/2 %>" y="<%= sy + sh/2 + 8 %>" text-anchor="middle" font-size="<%= [sh * 0.16, 9].min %>" fill="#6b7280"><%= plant.lifecycle_stage.tr('_', ' ') %></text>
-                  </a>
-                <% else %>
-                  <rect x="<%= sx %>" y="<%= sy %>" width="<%= sw %>" height="<%= sh %>" rx="4" fill="<%= slot_fill %>" stroke="#d1d5db" stroke-width="1" stroke-dasharray="4,2" @click="openAIForBed('<%= bed.name %>', <%= all_slots.count { |s| s.plants.none? { |p| p.lifecycle_stage != 'done' } } %>)" style="cursor: pointer;"/>
-                <% end %>
-              <% end %>
-            <% end %>
-          </svg>
-        <% end %>
+          <% end %>
+        </svg>
       </div>
     <% end %>
   <% end %>
