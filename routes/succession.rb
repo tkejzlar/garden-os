@@ -321,6 +321,17 @@ class GardenApp
     message = body["message"].to_s.strip
     halt 400, json(error: "message required") if message.empty?
 
+    # Prepend AI drawer context if provided
+    if body["context"]
+      ctx = body["context"]
+      parts = ["[Context: viewing #{ctx['view']} tab"]
+      parts << ", bed #{ctx['bed_name']}" if ctx["bed_name"]
+      parts << ", #{ctx['empty_slots']} empty slots" if ctx["empty_slots"]
+      parts << ", plants: #{ctx['current_plants'].join(', ')}" if ctx["current_plants"]&.any?
+      parts << "]"
+      message = parts.join + " " + message
+    end
+
     require_relative "../services/planner_service"
     require_relative "../services/garden_logger"
     require "securerandom"
