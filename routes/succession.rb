@@ -436,12 +436,12 @@ class GardenApp
         GardenLogger.info "[Planner/Async] #{request_id} done, #{result[:content]&.length} chars"
 
         PLANNER_MUTEX.synchronize do
-          PLANNER_RESULTS[request_id] = { status: "done", content: result[:content], draft: result[:draft] }
+          PLANNER_RESULTS[request_id] = { status: "done", content: result[:content], draft: result[:draft], bed_layout: result[:bed_layout] }
         end
       rescue => e
         GardenLogger.error "[Planner/Async] #{request_id} error: #{e.message}"
         PLANNER_MUTEX.synchronize do
-          PLANNER_RESULTS[request_id] = { status: "done", content: "Error: #{e.message}", draft: nil }
+          PLANNER_RESULTS[request_id] = { status: "done", content: "Error: #{e.message}", draft: nil, bed_layout: nil }
         end
       end
       # Cleanup after 5 min

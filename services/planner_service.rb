@@ -8,6 +8,7 @@ require_relative "planner_tools/get_plants_tool"
 require_relative "planner_tools/get_succession_plans_tool"
 require_relative "planner_tools/get_weather_tool"
 require_relative "planner_tools/draft_plan_tool"
+require_relative "planner_tools/draft_bed_layout_tool"
 
 class PlannerService
   attr_reader :last_draft
@@ -81,6 +82,7 @@ class PlannerService
         .with_tool(GetSuccessionPlansTool)
         .with_tool(GetWeatherTool)
         .with_tool(DraftPlanTool)
+        .with_tool(DraftBedLayoutTool)
 
       # Log tool calls
       c.on_tool_call do |tool_call|
@@ -105,6 +107,7 @@ class PlannerService
     PlannerMessage.create(garden_id: @garden_id, role: "user", content: user_text, created_at: Time.now)
 
     Thread.current[:planner_draft] = nil
+    Thread.current[:planner_bed_layout] = nil
     @tool_calls = []
 
     GardenLogger.info "[Planner] Sending to LLM..."
@@ -113,6 +116,7 @@ class PlannerService
     elapsed = (Time.now - start_time).round(1)
 
     @last_draft = Thread.current[:planner_draft]
+    @last_bed_layout = Thread.current[:planner_bed_layout]
 
     GardenLogger.info "[Planner] Response received in #{elapsed}s, content_length=#{response.content&.length || 0}, tool_calls=#{@tool_calls.length}, has_draft=#{!@last_draft.nil?}"
 
@@ -141,7 +145,7 @@ class PlannerService
       created_at: Time.now
     )
 
-    { content: content, draft: @last_draft, tool_calls: @tool_calls }
+    { content: content, draft: @last_draft, bed_layout: @last_bed_layout, tool_calls: @tool_calls }
   rescue => e
     elapsed = start_time ? (Time.now - start_time).round(1) : 0
     GardenLogger.error "[Planner] Error after #{elapsed}s: #{e.class}: #{e.message}"
@@ -160,7 +164,7 @@ class PlannerService
     )
 
     PlannerMessage.create(garden_id: @garden_id, role: "assistant", content: "Sorry, I encountered an error. Please try again.", created_at: Time.now)
-    { content: "Sorry, I encountered an error: #{e.message}", draft: nil, tool_calls: @tool_calls }
+    { content: "Sorry, I encountered an error: #{e.message}", draft: nil, bed_layout: nil, tool_calls: @tool_calls }
   end
 
   # Streaming version — yields chunks as they arrive
