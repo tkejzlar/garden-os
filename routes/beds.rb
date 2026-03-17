@@ -18,18 +18,10 @@ class GardenApp
     @arches = Arch.where(garden_id: @current_garden.id).all
     @indoor_stations = IndoorStation.where(garden_id: @current_garden.id).all
 
-    # Build full bed data for the plant overlay (same query as the old /beds page)
+    # Build full bed data for the plant overlay
     @bed_data = @beds.map do |bed|
-      rows = Row.where(bed_id: bed.id).order(:position).all
-      row_data = rows.map do |row|
-        slots = Slot.where(row_id: row.id).order(:position).all
-        slot_ids = slots.map(&:id)
-        plants_by_slot = Plant.where(slot_id: slot_ids)
-                              .exclude(lifecycle_stage: "done")
-                              .all.group_by(&:slot_id)
-        { row: row, slots: slots.map { |s| { slot: s, plant: plants_by_slot[s.id]&.first } } }
-      end
-      { bed: bed, rows: row_data }
+      plants = Plant.where(bed_id: bed.id).exclude(lifecycle_stage: "done").all
+      { bed: bed, plants: plants }
     end
 
     erb :garden
@@ -40,14 +32,7 @@ class GardenApp
   get "/beds/:id" do
     @bed = Bed[params[:id].to_i]
     halt 404 unless @bed
-    @rows = Row.where(bed_id: @bed.id).order(:position).all
-    row_ids = @rows.map(&:id)
-    all_slots = Slot.where(row_id: row_ids).order(:position).all
-    slot_ids = all_slots.map(&:id)
-    @plants_by_slot = Plant.where(slot_id: slot_ids)
-                           .exclude(lifecycle_stage: "done")
-                           .all.group_by(&:slot_id)
-    @slots_by_row = all_slots.group_by(&:row_id)
+    @plants = Plant.where(bed_id: @bed.id).exclude(lifecycle_stage: "done").all
     erb :"beds/show"
   end
 
@@ -55,14 +40,23 @@ class GardenApp
 
   get "/api/beds" do
     beds = Bed.where(garden_id: @current_garden.id).all.map do |bed|
-      rows = Row.where(bed_id: bed.id).order(:position).all.map do |row|
-        slots = Slot.where(row_id: row.id).order(:position).all.map do |slot|
-          plant = Plant.where(slot_id: slot.id).exclude(lifecycle_stage: "done").first
-          slot.values.merge(plant: plant&.values)
-        end
-        row.values.merge(slots: slots)
-      end
-      bed.values.merge(rows: rows)
+      active_plants = Plant.where(bed_id: bed.id).exclude(lifecycle_stage: "done").all
+      {
+        id: bed.id, name: bed.name,
+        width_cm: bed.width, length_cm: bed.length,
+        grid_cols: bed.grid_cols, grid_rows: bed.grid_rows,
+        canvas_color: bed.canvas_color,
+        canvas_x: bed.canvas_x, canvas_y: bed.canvas_y,
+        canvas_width: bed.canvas_width, canvas_height: bed.canvas_height,
+        canvas_points: bed.canvas_points,
+        bed_type: bed.bed_type,
+        plants: active_plants.map { |p|
+          { id: p.id, variety_name: p.variety_name, crop_type: p.crop_type,
+            lifecycle_stage: p.lifecycle_stage,
+            grid_x: p.grid_x, grid_y: p.grid_y, grid_w: p.grid_w, grid_h: p.grid_h,
+            quantity: p.quantity }
+        }
+      }
     end
     json beds
   end
@@ -178,7 +172,6 @@ class GardenApp
     bed = Bed[params[:id].to_i]
     halt 404, json(error: "Bed not found") unless bed
 
-    # Cascade: delete rows → slots (DB handles via ON DELETE CASCADE)
     bed.destroy
     json(success: true)
   end
