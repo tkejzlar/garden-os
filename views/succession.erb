@@ -89,6 +89,16 @@
       </template>
     </div>
 
+    <!-- Commit latest draft — standalone button outside template loop -->
+    <div x-show="latestDraft()" class="mb-3 p-3 rounded-lg" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
+      <p class="text-xs font-semibold mb-1" style="color: #166534;">Latest plan ready</p>
+      <button @click="commitDraft(latestDraft())"
+        class="text-xs px-3 py-1.5 rounded-lg font-medium"
+        style="background: var(--green-900); color: white;">
+        Create this plan
+      </button>
+    </div>
+
     <!-- Input -->
     <div class="flex gap-2 items-end">
       <textarea x-model="input" @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
@@ -209,6 +219,14 @@ function plannerChat() {
       if (!confirm('Start a new planning conversation?')) return;
       await fetch('/succession/planner/messages', { method: 'DELETE' });
       this.messages = [];
+    },
+
+    latestDraft() {
+      // Find the most recent message with a draft that hasn't been committed
+      for (let i = this.messages.length - 1; i >= 0; i--) {
+        if (this.messages[i].draft && !this.messages[i].committed) return this.messages[i].draft;
+      }
+      return null;
     },
 
     scrollToBottom() {
