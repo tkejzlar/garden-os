@@ -8,11 +8,21 @@ class TestSuccession < GardenTest
   end
 
   def test_succession_page_includes_alpine_component
-    SuccessionPlan.create(crop: "Lettuce", varieties: '["Tre Colori"]',
-                          interval_days: 18, total_planned_sowings: 8,
-                          garden_id: @garden.id)
+    SuccessionPlan.create(
+      crop: "Lettuce",
+      varieties: '["Tre Colori"]',
+      interval_days: 14,
+      total_planned_sowings: 5,
+      garden_id: @garden.id
+    )
+
     get "/succession"
-    assert_includes last_response.body, "x-data=\"gantt()\""
+    assert_equal 200, last_response.status
+    assert_includes last_response.body, 'x-data="planTab()"'
+    assert_includes last_response.body, "Season Plan"
+    assert_includes last_response.body, "Tasks"
+    assert_includes last_response.body, "Timeline"
+    assert_includes last_response.body, "Beds"
   end
 
   def test_succession_index_has_summary_strip
