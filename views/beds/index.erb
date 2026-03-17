@@ -49,22 +49,20 @@
       <h2 class="font-semibold mb-3" style="color: var(--text-primary);">
         <%= bed.name %>
       </h2>
-      <% bd[:rows].each do |rd| %>
-        <div class="flex items-center gap-1 mb-1.5">
-          <span class="text-xs w-10 shrink-0" style="color: var(--gray-500); font-size: 10px;">
-            <%= rd[:row].name %>
-          </span>
-          <div class="flex gap-1 flex-wrap">
-            <% rd[:slots].each do |sd| %>
-              <% plant = sd[:plant] %>
-              <div class="w-7 h-7 rounded text-center text-xs flex items-center justify-center font-medium"
-                   style="<%= crop_cell_style(plant, crop_colors, empty_colors) %>"
-                   title="<%= plant ? "#{plant.variety_name} (#{plant.lifecycle_stage.tr('_', ' ')})" : sd[:slot].name %>">
-                <%= plant ? plant.variety_name[0..1] : "" %>
-              </div>
-            <% end %>
-          </div>
+      <% plants = bed.plants.exclude(lifecycle_stage: "done").all rescue [] %>
+      <% if plants.any? %>
+        <div class="flex gap-1 flex-wrap">
+          <% plants.each do |plant| %>
+            <% c = crop_colors[plant.crop_type] || { bg: "#f3f4f6", border: "#d1d5db", text: "#374151" } %>
+            <div class="w-7 h-7 rounded text-center text-xs flex items-center justify-center font-medium"
+                 style="background: <%= c[:bg] %>; border: 1px solid <%= c[:border] %>; color: <%= c[:text] %>;"
+                 title="<%= plant.variety_name %> (<%= plant.lifecycle_stage.tr('_', ' ') %>)">
+              <%= plant.variety_name[0..1] %>
+            </div>
+          <% end %>
         </div>
+      <% else %>
+        <p class="text-xs" style="color: var(--gray-400);">Empty</p>
       <% end %>
     </a>
   <% end %>
