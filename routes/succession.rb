@@ -278,6 +278,91 @@ class GardenApp
     json task.values.merge(due_date: task.due_date.to_s)
   end
 
+  # ── Bed Layout Endpoints ────────────────────────────────────────────────
+
+  patch "/beds/:id/swap-slots" do
+    content_type :json
+    bed = Bed[params[:id].to_i]
+    halt 404, json(error: "Bed not found") unless bed
+    halt 403, json(error: "Not your bed") unless bed.garden_id == @current_garden.id
+
+    request.body.rewind
+    body = begin
+      JSON.parse(request.body.read)
+    rescue
+      halt 400, json(error: "Invalid JSON")
+    end
+
+    slot_a = Slot[body["slot_a"].to_i]
+    slot_b = Slot[body["slot_b"].to_i]
+    halt 404, json(error: "Slot not found") unless slot_a && slot_b
+
+    bed_slot_ids = bed.rows.flat_map(&:slots).map(&:id)
+    halt 422, json(error: "Slots don't belong to this bed") unless bed_slot_ids.include?(slot_a.id) && bed_slot_ids.include?(slot_b.id)
+
+    plant_a = slot_a.plants.find { |p| p.lifecycle_stage != "done" }
+    plant_b = slot_b.plants.find { |p| p.lifecycle_stage != "done" }
+
+    DB.transaction do
+      plant_a&.update(slot_id: nil)
+      plant_b&.update(slot_id: slot_a.id, updated_at: Time.now) if plant_b
+      plant_a&.update(slot_id: slot_b.id, updated_at: Time.now) if plant_a
+    end
+
+    json(ok: true)
+  end
+
+  post "/beds/:id/apply-layout" do
+    content_type :json
+    bed = Bed[params[:id].to_i]
+    halt 404, json(error: "Bed not found") unless bed
+    halt 403, json(error: "Not your bed") unless bed.garden_id == @current_garden.id
+
+    request.body.rewind
+    body = begin
+      JSON.parse(request.body.read)
+    rescue
+      halt 400, json(error: "Invalid JSON")
+    end
+
+    action = body["action"]
+    bed_slot_ids = bed.rows.flat_map(&:slots).map(&:id)
+
+    case action
+    when "fill", "plan_full"
+      suggestions = body["suggestions"] || []
+      created = suggestions.map do |s|
+        slot_id = s["slot_id"].to_i
+        halt 422, json(error: "Slot #{slot_id} doesn't belong to this bed") unless bed_slot_ids.include?(slot_id)
+
+        Plant.create(
+          garden_id: @current_garden.id,
+          slot_id: slot_id,
+          variety_name: s["variety_name"],
+          crop_type: s["crop_type"],
+          lifecycle_stage: "seed_packet"
+        )
+      end
+      json(ok: true, created: created.count)
+
+    when "rearrange"
+      moves = body["moves"] || []
+      DB.transaction do
+        moves.each do |m|
+          plant = Plant[m["plant_id"].to_i]
+          next unless plant && plant.garden_id == @current_garden.id
+          to_slot = m["to_slot_id"].to_i
+          halt 422, json(error: "Slot #{to_slot} doesn't belong to this bed") unless bed_slot_ids.include?(to_slot)
+          plant.update(slot_id: to_slot, updated_at: Time.now)
+        end
+      end
+      json(ok: true)
+
+    else
+      halt 400, json(error: "Unknown action: #{action}")
+    end
+  end
+
   # ── AI Planner Chat ──────────────────────────────────────────────────────
 
   # Non-streaming fallback
@@ -351,12 +436,12 @@ class GardenApp
         GardenLogger.info "[Planner/Async] #{request_id} done, #{result[:content]&.length} chars"
 
         PLANNER_MUTEX.synchronize do
-          PLANNER_RESULTS[request_id] = { status: "done", content: result[:content], draft: result[:draft] }
+          PLANNER_RESULTS[request_id] = { status: "done", content: result[:content], draft: result[:draft], bed_layout: result[:bed_layout] }
         end
       rescue => e
         GardenLogger.error "[Planner/Async] #{request_id} error: #{e.message}"
         PLANNER_MUTEX.synchronize do
-          PLANNER_RESULTS[request_id] = { status: "done", content: "Error: #{e.message}", draft: nil }
+          PLANNER_RESULTS[request_id] = { status: "done", content: "Error: #{e.message}", draft: nil, bed_layout: nil }
         end
       end
       # Cleanup after 5 min

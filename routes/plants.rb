@@ -78,6 +78,29 @@ class GardenApp
     redirect back
   end
 
+  patch "/plants/:id" do
+    content_type :json
+    plant = Plant[params[:id].to_i]
+    halt 404, json(error: "Plant not found") unless plant
+    halt 403, json(error: "Not your plant") unless plant.garden_id == @current_garden.id
+
+    request.body.rewind
+    body = begin
+      JSON.parse(request.body.read)
+    rescue
+      halt 400, json(error: "Invalid JSON")
+    end
+
+    if body["slot_id"]
+      slot = Slot[body["slot_id"].to_i]
+      halt 404, json(error: "Slot not found") unless slot
+      halt 403, json(error: "Slot not in your garden") unless slot.row.bed.garden_id == @current_garden.id
+      plant.update(slot_id: slot.id, updated_at: Time.now)
+    end
+
+    json plant.values
+  end
+
   post "/api/plants" do
     data = JSON.parse(request.body.read)
     plant = Plant.create(

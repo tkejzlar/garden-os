@@ -100,4 +100,43 @@ class TestSuccession < GardenTest
     assert bed_data["crops"].is_a?(Array)
     assert_equal "tomato", bed_data["crops"].first["crop"]
   end
+
+  def test_swap_slots
+    bed = Bed.create(garden_id: @garden.id, name: "SwapBed")
+    row = Row.create(bed_id: bed.id, position: 1, name: "R1")
+    slot_a = Slot.create(row_id: row.id, position: 1, name: "A1")
+    slot_b = Slot.create(row_id: row.id, position: 2, name: "B1")
+
+    plant_a = Plant.create(garden_id: @garden.id, slot_id: slot_a.id, variety_name: "Raf", crop_type: "tomato", lifecycle_stage: "seedling")
+    plant_b = Plant.create(garden_id: @garden.id, slot_id: slot_b.id, variety_name: "Basil", crop_type: "herb", lifecycle_stage: "seedling")
+
+    patch "/beds/#{bed.id}/swap-slots", { slot_a: slot_a.id, slot_b: slot_b.id }.to_json, { "CONTENT_TYPE" => "application/json" }
+    assert_equal 200, last_response.status
+
+    plant_a.refresh
+    plant_b.refresh
+    assert_equal slot_b.id, plant_a.slot_id
+    assert_equal slot_a.id, plant_b.slot_id
+  end
+
+  def test_apply_layout_fill
+    bed = Bed.create(garden_id: @garden.id, name: "FillBed")
+    row = Row.create(bed_id: bed.id, position: 1, name: "R1")
+    slot = Slot.create(row_id: row.id, position: 1, name: "S1")
+
+    post "/beds/#{bed.id}/apply-layout", {
+      action: "fill",
+      suggestions: [
+        { slot_id: slot.id, variety_name: "Cherry Belle", crop_type: "radish" }
+      ]
+    }.to_json, { "CONTENT_TYPE" => "application/json" }
+
+    assert_equal 200, last_response.status
+
+    plant = Plant.where(slot_id: slot.id).first
+    assert plant
+    assert_equal "Cherry Belle", plant.variety_name
+    assert_equal "radish", plant.crop_type
+    assert_equal "seed_packet", plant.lifecycle_stage
+  end
 end
