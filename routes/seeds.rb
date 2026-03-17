@@ -63,7 +63,7 @@ class GardenApp
       created_at:   Time.now,
       updated_at:   Time.now
     )
-    redirect "/seeds"
+    redirect "/seeds/new"
   end
 
   patch "/seeds/:id" do
