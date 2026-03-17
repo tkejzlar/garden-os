@@ -394,7 +394,7 @@
           <div style="margin-top: 8px; padding: 10px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px;">
             <div style="font-size: 11px; color: var(--green-900); font-weight: 600; margin-bottom: 6px;">Plan Draft</div>
             <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;" x-text="(msg.draft.assignments?.length || 0) + ' plants, ' + (msg.draft.tasks?.length || 0) + ' tasks, ' + (msg.draft.successions?.length || 0) + ' successions'"></div>
-            <button @click="fetch('/succession/planner/commit', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(msg.draft)}).then(() => location.reload())" style="padding: 6px 16px; background: var(--green-900); color: white; border: none; border-radius: 8px; font-size: 12px; cursor: pointer;">Create this plan</button>
+            <button @click="fetch('/succession/planner/commit', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({draft_payload: msg.draft})}).then(() => location.reload())" style="padding: 6px 16px; background: var(--green-900); color: white; border: none; border-radius: 8px; font-size: 12px; cursor: pointer;">Create this plan</button>
           </div>
         </template>
       </div>

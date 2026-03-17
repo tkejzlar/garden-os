@@ -97,7 +97,7 @@ class GardenApp
       d = d >> 1
     end
 
-    beds = Bed.where(garden_id: @current_garden.id).all.map do |bed|
+    beds = Bed.where(garden_id: @current_garden.id).eager(rows: {slots: :plants}).all.map do |bed|
       rows = bed.rows
       slots = rows.flat_map(&:slots)
       total_slots = slots.count
