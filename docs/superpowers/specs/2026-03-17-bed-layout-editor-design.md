@@ -106,7 +106,7 @@ Long-press (300ms) on an occupied slot starts drag mode:
 
 ### New Endpoints
 
-`PATCH /plants/:id` — already exists for stage advancement, extend to accept `slot_id` update.
+`PATCH /plants/:id` — new endpoint (stage advancement is `POST /plants/:id/advance`). Accepts `{ slot_id: N }` to move a plant to a different slot.
 
 `PATCH /beds/:id/swap-slots` — new endpoint:
 
