@@ -6,6 +6,8 @@ class GardenApp
     @plans = SuccessionPlan.where(garden_id: @current_garden.id).all
     require_relative "../models/planner_message"
     @planner_messages = PlannerMessage.where(garden_id: @current_garden.id).order(:created_at).all
+    @all_tasks = Task.where(garden_id: @current_garden.id).exclude(status: "done").order(:due_date).all
+    @done_tasks = Task.where(garden_id: @current_garden.id, status: "done").order(Sequel.desc(:completed_at)).limit(10).all
     erb :succession
   end
 

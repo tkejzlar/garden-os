@@ -334,6 +334,63 @@ function plannerChat() {
   </div>
 </div>
 
+<!-- Task Timeline — all upcoming tasks grouped by month -->
+<% if @all_tasks.any? %>
+  <div class="mb-6">
+    <h2 class="text-lg font-semibold mb-3" style="color: var(--text-primary);">Upcoming Tasks</h2>
+    <%
+      tasks_by_month = @all_tasks.group_by { |t| t.due_date ? t.due_date.strftime("%B %Y") : "No date" }
+    %>
+    <% tasks_by_month.each do |month, tasks| %>
+      <p class="mb-2 mt-4 first:mt-0" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; color: var(--gray-500);">
+        <%= month %>
+      </p>
+      <div class="space-y-1.5">
+        <% tasks.each do |task| %>
+          <div class="flex items-center gap-3 px-3 py-2.5"
+               style="background: white; border-radius: var(--card-radius); box-shadow: var(--card-shadow);">
+            <form method="post" action="/tasks/<%= task.id %>/complete" class="shrink-0">
+              <button type="submit" class="w-6 h-6 rounded-full border-2 flex items-center justify-center"
+                      style="border-color: var(--success); cursor: pointer;"
+                      title="Mark done"></button>
+            </form>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium truncate" style="color: var(--text-primary);"><%= task.title %></p>
+              <p class="text-xs" style="color: var(--gray-500);">
+                <%= task.due_date&.strftime("%a %b %-d") %>
+                <% if task.notes && !task.notes.empty? %>
+                  · <span style="color: var(--text-secondary);"><%= task.notes.slice(0, 80) %></span>
+                <% end %>
+              </p>
+            </div>
+            <span class="text-xs px-2 py-0.5 rounded-full shrink-0"
+                  style="<%= task.priority == 'must' ? 'background: #fef2f2; color: #991b1b;' :
+                            task.priority == 'should' ? 'background: #fef3c7; color: #92400e;' :
+                            'background: #f3f4f6; color: var(--gray-500);' %>">
+              <%= task.priority %>
+            </span>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <% if @done_tasks.any? %>
+    <details class="mb-6">
+      <summary class="text-sm font-medium cursor-pointer" style="color: var(--gray-500);">
+        <%= @done_tasks.length %> completed tasks
+      </summary>
+      <div class="mt-2 space-y-1">
+        <% @done_tasks.each do |task| %>
+          <div class="px-3 py-2 text-sm" style="color: var(--gray-400); text-decoration: line-through;">
+            <%= task.title %>
+          </div>
+        <% end %>
+      </div>
+    </details>
+  <% end %>
+<% end %>
+
 <!-- Gantt chart (only when plans exist) -->
 <% if @plans.empty? %>
   <div class="text-center py-12" style="color: var(--text-secondary);">

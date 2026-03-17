@@ -28,6 +28,12 @@
     </span>
   </div>
 
+  <% if @plant.stage_instruction %>
+    <div class="mb-4 px-3 py-2.5 rounded-lg text-xs leading-relaxed" style="background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;">
+      <strong>What to do now:</strong> <%= @plant.stage_instruction %>
+    </div>
+  <% end %>
+
   <% next_stages = Plant::LIFECYCLE_STAGES.drop(Plant::LIFECYCLE_STAGES.index(@plant.lifecycle_stage).to_i + 1).first(3) %>
   <% unless next_stages.empty? %>
     <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; color: var(--gray-500);" class="mb-2">
