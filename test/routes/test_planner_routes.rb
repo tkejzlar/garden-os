@@ -27,13 +27,11 @@ class TestPlannerRoutes < GardenTest
   end
 
   def test_commit_creates_records
-    bed = Bed.create(name: "BB1", bed_type: "raised", garden_id: @garden.id)
-    row = Row.create(bed_id: bed.id, name: "A", position: 1)
-    Slot.create(row_id: row.id, name: "Pos1", position: 1)
+    Bed.create(name: "BB1", bed_type: "raised", garden_id: @garden.id, width: 120, length: 240)
 
     draft = {
       "assignments" => [
-        { "bed_name" => "BB1", "row_name" => "A", "slot_position" => 1,
+        { "bed_name" => "BB1",
           "variety_name" => "Raf", "crop_type" => "tomato" }
       ],
       "successions" => [],

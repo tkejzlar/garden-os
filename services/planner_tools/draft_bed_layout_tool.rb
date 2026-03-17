@@ -3,7 +3,7 @@ require "ruby_llm"
 class DraftBedLayoutTool < RubyLLM::Tool
   description "Suggest a plant layout for a specific garden bed. Use when the user asks about what to plant in a bed, how to arrange plants, or wants a layout plan. Returns structured data that the user can preview and apply."
 
-  param :payload, type: :string, desc: 'JSON string: { "bed_name": "BB1", "action": "fill|rearrange|plan_full", "suggestions": [{"slot_id": 42, "variety_name": "Raf", "crop_type": "tomato", "reason": "Companion to basil"}], "moves": [{"plant_id": 12, "from_slot_id": 42, "to_slot_id": 45, "reason": "Move basil next to tomatoes"}] }. Use "suggestions" for fill/plan_full, "moves" for rearrange.'
+  param :payload, type: :string, desc: 'JSON string: { "bed_name": "BB1", "action": "fill|rearrange|plan_full", "suggestions": [{"grid_x": 0, "grid_y": 0, "grid_w": 4, "grid_h": 4, "quantity": 1, "variety_name": "Raf", "crop_type": "tomato", "reason": "Companion to basil"}], "moves": [{"plant_id": 12, "grid_x": 0, "grid_y": 0, "grid_w": 4, "grid_h": 4, "reason": "Move basil next to tomatoes"}] }. Use "suggestions" for fill/plan_full, "moves" for rearrange.'
 
   def execute(payload:)
     parsed = JSON.parse(payload)
