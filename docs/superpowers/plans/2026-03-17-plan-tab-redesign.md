@@ -380,6 +380,7 @@ function planTab() {
   return {
     tab: 'tasks',
     expandedBeds: [],
+    selectedBed: null,
     timelineData: null,
     loading: false,
 
@@ -420,7 +421,73 @@ function planTab() {
     },
 
     getAIContext() {
-      return { view: this.tab };
+      const ctx = { view: this.tab };
+      if (this.tab === 'beds' && this.selectedBed) {
+        ctx.bed_name = this.selectedBed.name;
+        ctx.empty_slots = this.selectedBed.empty_count;
+        ctx.current_plants = this.selectedBed.plants;
+      }
+      if (this.tab === 'timeline' && this.expandedBeds.length) {
+        ctx.expanded_beds = this.expandedBeds;
+      }
+      return ctx;
+    },
+
+    selectBed(name, emptyCount, plants) {
+      this.selectedBed = { name, empty_count: emptyCount, plants };
+    },
+
+    openAIForBed(bedName, emptyCount) {
+      this.selectedBed = { name: bedName, empty_count: emptyCount, plants: [] };
+      this.$refs.aiDrawer.showModal();
+    },
+
+    // AI drawer state and methods (in same scope for cross-access)
+    aiMessages: JSON.parse(document.getElementById('planner-data')?.textContent || '[]'),
+    aiInput: '',
+    aiSending: false,
+
+    async sendAIMessage() {
+      if (!this.aiInput.trim() || this.aiSending) return;
+      const text = this.aiInput.trim();
+      this.aiInput = '';
+      this.aiMessages.push({ role: 'user', content: text, id: Date.now() });
+      this.aiSending = true;
+
+      try {
+        const context = this.getAIContext();
+        const res = await fetch('/succession/planner/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, context })
+        });
+        const { request_id } = await res.json();
+        await this.pollForAIResponse(request_id);
+      } catch(e) {
+        this.aiMessages.push({ role: 'assistant', content: 'Sorry, something went wrong.', id: Date.now() });
+      }
+      this.aiSending = false;
+    },
+
+    async pollForAIResponse(requestId) {
+      for (let i = 0; i < 60; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        const res = await fetch(`/succession/planner/result/${requestId}`);
+        const data = await res.json();
+        if (data.status === 'done') {
+          this.aiMessages.push({ role: 'assistant', content: data.content, id: Date.now(), draft: data.draft });
+          return;
+        }
+        if (data.status === 'error') {
+          this.aiMessages.push({ role: 'assistant', content: data.error || 'Planning failed.', id: Date.now() });
+          return;
+        }
+      }
+    },
+
+    sendQuickAction(text) {
+      this.aiInput = text;
+      this.sendAIMessage();
     }
   }
 }
@@ -568,6 +635,20 @@ function planTab() {
         </div>
       </div>
 
+      <!-- Today marker -->
+      <div style="position: relative; padding: 0 16px; pointer-events: none;">
+        <div :style="(() => {
+          const ss = new Date(timelineData.season_start);
+          const se = new Date(timelineData.season_end);
+          const now = new Date(timelineData.today);
+          const pct = (now - ss) / (se - ss) * 100;
+          if (pct < 0 || pct > 100) return 'display:none;';
+          return 'position:absolute; left:calc(48px + 16px + (100% - 48px - 32px) * ' + (pct/100) + '); top:0; height:300px; width:1.5px; background:#ef4444; z-index:10;';
+        })()">
+          <div style="position:absolute; top:-2px; left:-10px; font-size:8px; color:#ef4444; font-weight:600;">Today</div>
+        </div>
+      </div>
+
       <!-- Bed rows -->
       <template x-for="bed in timelineData.beds" :key="bed.bed_id">
         <div style="margin-bottom: 4px;">
@@ -693,7 +774,7 @@ function planTab() {
                     <div style="font-size: 9px; color: var(--text-secondary);"><%= plant.crop_type %> · <%= plant.lifecycle_stage.tr('_', ' ') %></div>
                   </a>
                 <% else %>
-                  <div style="flex: 1; background: #f9fafb; border-radius: 6px; padding: 6px 8px; border: 1px dashed #d1d5db;">
+                  <div @click="openAIForBed('<%= bed.name %>', <%= slots.count { |s| s.plants.none? { |p| p.lifecycle_stage != 'done' } } %>)" style="flex: 1; background: #f9fafb; border-radius: 6px; padding: 6px 8px; border: 1px dashed #d1d5db; cursor: pointer;">
                     <div style="font-size: 11px; color: var(--gray-400);">Empty</div>
                   </div>
                 <% end %>
@@ -753,24 +834,41 @@ function planTab() {
   ✦
 </div>
 
-<!-- AI Drawer as dialog -->
-<dialog x-ref="aiDrawer" style="position: fixed; bottom: 0; left: 0; right: 0; margin: 0; padding: 0; border: none; background: white; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); max-height: 85vh; width: 100%; max-width: 100%;" x-data="aiDrawer()">
+<!-- AI Drawer as dialog (inside planTab scope — access tab/selectedBed directly) -->
+<dialog x-ref="aiDrawer" style="position: fixed; bottom: 0; left: 0; right: 0; margin: 0; padding: 0; border: none; background: white; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); max-height: 85vh; width: 100%; max-width: 100%;">
   <!-- Handle -->
   <div style="display: flex; justify-content: center; padding: 8px; cursor: pointer;" @click="$refs.aiDrawer.close()">
     <div style="width: 36px; height: 4px; background: #d1d5db; border-radius: 2px;"></div>
   </div>
   <!-- Context banner -->
   <div style="margin: 0 12px 8px; padding: 8px 12px; background: var(--green-50); border-radius: 8px; border: 1px solid #dcfce7;">
-    <div style="font-size: 10px; color: var(--green-900); font-weight: 600;" x-text="'Context: ' + $data.tab + ' tab'"></div>
+    <div style="font-size: 10px; color: var(--green-900); font-weight: 600;" x-text="'Context: ' + tab + ' tab' + (selectedBed ? ' → ' + selectedBed.name : '')"></div>
+    <div x-show="selectedBed" style="font-size: 10px; color: var(--text-secondary);" x-text="selectedBed ? selectedBed.empty_count + ' empty slots' : ''"></div>
   </div>
-  <!-- Quick actions -->
+  <!-- Quick actions (tab-contextual) -->
   <div style="padding: 0 12px; display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;">
-    <button @click="sendQuickAction('What should I do this week?')" style="font-size: 11px; padding: 6px 12px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px; color: var(--green-900); cursor: pointer;">What should I do this week?</button>
-    <button @click="sendQuickAction('Plan next month')" style="font-size: 11px; padding: 6px 12px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px; color: var(--green-900); cursor: pointer;">Plan next month</button>
+    <template x-if="tab === 'tasks' || !tab">
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <button @click="sendQuickAction('What should I do this week?')" style="font-size: 11px; padding: 6px 12px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px; color: var(--green-900); cursor: pointer;">What should I do this week?</button>
+        <button @click="sendQuickAction('Reprioritize my tasks')" style="font-size: 11px; padding: 6px 12px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px; color: var(--green-900); cursor: pointer;">Reprioritize my tasks</button>
+      </div>
+    </template>
+    <template x-if="tab === 'timeline'">
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <button @click="sendQuickAction('Any gaps I should fill?')" style="font-size: 11px; padding: 6px 12px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px; color: var(--green-900); cursor: pointer;">Any gaps I should fill?</button>
+        <button @click="sendQuickAction('Plan next month')" style="font-size: 11px; padding: 6px 12px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px; color: var(--green-900); cursor: pointer;">Plan next month</button>
+      </div>
+    </template>
+    <template x-if="tab === 'beds'">
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <button @click="sendQuickAction('What should I plant here?')" style="font-size: 11px; padding: 6px 12px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px; color: var(--green-900); cursor: pointer;">What should I plant here?</button>
+        <button @click="sendQuickAction('Rotation suggestions')" style="font-size: 11px; padding: 6px 12px; background: var(--green-50); border: 1px solid #dcfce7; border-radius: 8px; color: var(--green-900); cursor: pointer;">Rotation suggestions</button>
+      </div>
+    </template>
   </div>
   <!-- Messages -->
   <div x-ref="aiMessages" style="padding: 0 12px; max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
-    <template x-for="msg in messages" :key="msg.id">
+    <template x-for="msg in aiMessages" :key="msg.id">
       <div :style="msg.role === 'user' ? 'align-self: flex-end; background: var(--green-50); max-width: 80%;' : 'background: #f9fafb; max-width: 85%;'" style="border-radius: 10px; padding: 10px 12px;">
         <div x-show="msg.role === 'assistant'" style="font-size: 10px; color: var(--green-900); font-weight: 600; margin-bottom: 4px;">✦ AI Planner</div>
         <div style="font-size: 12px; color: var(--text-body); line-height: 1.5;" x-html="msg.role === 'assistant' ? marked.parse(msg.content || '') : msg.content"></div>
@@ -787,68 +885,15 @@ function planTab() {
   </div>
   <!-- Input -->
   <div style="padding: 12px; margin-top: 8px; border-top: 1px solid #e5e7eb;">
-    <form @submit.prevent="sendMessage()" style="display: flex; gap: 8px; align-items: center;">
-      <input x-model="input" type="text" placeholder="Ask about your plan..." style="flex: 1; background: #f3f4f6; border-radius: 10px; padding: 10px 14px; font-size: 12px; border: none; outline: none;">
+    <form @submit.prevent="sendAIMessage()" style="display: flex; gap: 8px; align-items: center;">
+      <input x-model="aiInput" type="text" placeholder="Ask about your plan..." style="flex: 1; background: #f3f4f6; border-radius: 10px; padding: 10px 14px; font-size: 12px; border: none; outline: none;">
       <button type="submit" style="width: 36px; height: 36px; background: var(--green-900); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; border: none; cursor: pointer;">↑</button>
     </form>
   </div>
 </dialog>
 ```
 
-**Alpine.js aiDrawer() component:**
-
-```javascript
-function aiDrawer() {
-  return {
-    messages: JSON.parse(document.getElementById('planner-data')?.textContent || '[]'),
-    input: '',
-    sending: false,
-
-    async sendMessage() {
-      if (!this.input.trim() || this.sending) return;
-      const text = this.input.trim();
-      this.input = '';
-      this.messages.push({ role: 'user', content: text, id: Date.now() });
-      this.sending = true;
-
-      try {
-        const context = this.$root.__x.$data?.getAIContext?.() || { view: 'tasks' };
-        const res = await fetch('/succession/planner/ask', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, context })
-        });
-        const { request_id } = await res.json();
-        await this.pollForResponse(request_id);
-      } catch(e) {
-        this.messages.push({ role: 'assistant', content: 'Sorry, something went wrong.', id: Date.now() });
-      }
-      this.sending = false;
-    },
-
-    async pollForResponse(requestId) {
-      for (let i = 0; i < 60; i++) {
-        await new Promise(r => setTimeout(r, 2000));
-        const res = await fetch(`/succession/planner/result/${requestId}`);
-        const data = await res.json();
-        if (data.status === 'done') {
-          this.messages.push({ role: 'assistant', content: data.content, id: Date.now(), draft: data.draft });
-          return;
-        }
-        if (data.status === 'error') {
-          this.messages.push({ role: 'assistant', content: data.error || 'Planning failed.', id: Date.now() });
-          return;
-        }
-      }
-    },
-
-    sendQuickAction(text) {
-      this.input = text;
-      this.sendMessage();
-    }
-  }
-}
-```
+**Note:** The AI drawer methods (`sendAIMessage`, `pollForAIResponse`, `sendQuickAction`, `aiMessages`, `aiInput`, `aiSending`) are part of the `planTab()` component — not a separate component. This allows direct access to `tab`, `selectedBed`, and `getAIContext()` without cross-component hacks. The `<dialog>` element lives inside the `x-data="planTab()"` wrapper.
 
 - [ ] **Step 2: Verify the page loads**
 
