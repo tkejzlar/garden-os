@@ -351,6 +351,7 @@ function gardenDesigner(bedsData) {
 
     // Drag / resize state
     dragging:     null,       // { bed, startMouseX, startMouseY, startBedX, startBedY }
+    draggingVertex: null,     // { bed, index }
     resizing:     null,       // { bed, startMouseX, startMouseY, startW, startH }
 
     // New bed creation flow
@@ -461,6 +462,25 @@ function gardenDesigner(bedsData) {
                 'font-family': 'system-ui, sans-serif', 'font-weight': 700, fill: 'white',
                 style: 'pointer-events:none;user-select:none;', textContent: (i + 1).toString()
               }));
+            }
+
+            // Draggable vertex handles at each corner
+            for (let i = 0; i < bpts.length; i++) {
+              const handle = self._createSvgEl('circle', {
+                cx: bpts[i][0], cy: bpts[i][1], r: 5,
+                fill: 'white', stroke: '#365314', 'stroke-width': 2,
+                style: 'cursor:move;'
+              });
+              handle.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                self.draggingVertex = { bed, index: i, startX: bpts[i][0], startY: bpts[i][1] };
+              });
+              handle.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                self.draggingVertex = { bed, index: i, startX: bpts[i][0], startY: bpts[i][1] };
+              });
+              g.appendChild(handle);
             }
           }
         } else {
@@ -742,6 +762,12 @@ function gardenDesigner(bedsData) {
           this.dragging.bed.canvas_x = this.snap(this.dragging.startBedX + dx);
           this.dragging.bed.canvas_y = this.snap(this.dragging.startBedY + dy);
         }
+      } else if (this.draggingVertex) {
+        const [mx, my] = this.svgPoint(e);
+        const bed = this.draggingVertex.bed;
+        const idx = this.draggingVertex.index;
+        bed.canvas_points[idx] = [this.snap(mx), this.snap(my)];
+        bed.canvas_points = [...bed.canvas_points]; // trigger reactivity
       } else if (this.resizing) {
         const [mx, my] = this.svgPoint(e);
         const dw = mx - this.resizing.startMouseX;
@@ -783,6 +809,11 @@ function gardenDesigner(bedsData) {
         const bed = this.resizing.bed;
         this.patchPosition(bed);
         this.resizing = null;
+      }
+
+      if (this.draggingVertex) {
+        this.patchPosition(this.draggingVertex.bed);
+        this.draggingVertex = null;
       }
     },
 
