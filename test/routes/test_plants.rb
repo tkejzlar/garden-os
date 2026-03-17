@@ -89,25 +89,20 @@ class TestPlants < GardenTest
     assert_equal 404, last_response.status
   end
 
-  def test_move_plant_to_new_slot
-    bed = Bed.create(garden_id: @garden.id, name: "TestBed")
-    row = Row.create(bed_id: bed.id, position: 1, name: "R1")
-    slot1 = Slot.create(row_id: row.id, position: 1, name: "S1")
-    slot2 = Slot.create(row_id: row.id, position: 2, name: "S2")
-
+  def test_move_plant_on_grid
+    bed = Bed.create(garden_id: @garden.id, name: "TestBed", width: 100, length: 100)
     plant = Plant.create(
-      garden_id: @garden.id,
-      slot_id: slot1.id,
-      variety_name: "Raf",
-      crop_type: "tomato",
-      lifecycle_stage: "seedling"
+      garden_id: @garden.id, bed_id: bed.id,
+      variety_name: "Raf", crop_type: "tomato", lifecycle_stage: "seedling",
+      grid_x: 0, grid_y: 0, grid_w: 4, grid_h: 4
     )
 
-    patch "/plants/#{plant.id}", { slot_id: slot2.id }.to_json, { "CONTENT_TYPE" => "application/json" }
+    patch "/plants/#{plant.id}", { grid_x: 5, grid_y: 5 }.to_json, { "CONTENT_TYPE" => "application/json" }
     assert_equal 200, last_response.status
 
     plant.refresh
-    assert_equal slot2.id, plant.slot_id
+    assert_equal 5, plant.grid_x
+    assert_equal 5, plant.grid_y
   end
 
   def test_plant_show_includes_harvest_section
