@@ -1085,3 +1085,60 @@ git commit -m "feat: garden map uses grid model — plants instead of rows/slots
 | 10 | Garden map: grid model | views/garden.erb |
 
 Total: **10 tasks**, 3 chunks (migration+models, routes+services, views). Breaking change — Row/Slot tables dropped.
+
+---
+
+## Critical Implementation Notes (from review)
+
+These corrections MUST be applied by implementers. They override the task descriptions above where they conflict.
+
+### Task 4: DO NOT replace the entire routes/beds.rb
+
+The plan's Task 4 Step 2 shows a full file replacement. **This is wrong.** Instead:
+- **Preserve** all existing routes: `GET /garden`, `POST /api/beds`, `PATCH /api/beds/:id/position`, `PATCH /api/beds/:id`, `DELETE /api/beds/:id`
+- **Only update** the three Row/Slot-dependent routes: `GET /beds/:id` (show), `GET /api/beds` (JSON), and `GET /garden` (data serialization)
+- **Keep** the existing `class GardenApp` structure — do NOT introduce `module Routes`
+- In `GET /garden`, replace the `Row.where` / `Slot.where` / `plants_by_slot` chain with `bed.plants` eager loading. The `@bed_data` structure must change from `{ bed:, rows: [{ row:, slots: [{ slot:, plant: }] }] }` to `{ bed:, plants: [...] }` matching what `garden.erb` expects
+- **Keep** `GET /beds` as a redirect to `/garden` (existing behavior)
+
+### Task 6: Timeline tab — update occupancyColor call
+
+The Timeline tab in `succession.erb` calls `occupancyColor(m.filled, bed.total_slots)`. After this migration, `total_slots` no longer exists in the API response. Update to: `occupancyColor(m.filled, bed.grid_cols * bed.grid_rows)`. Also update `bed.total_slots` in the legend/header if referenced.
+
+### Task 7: Preserve existing data in AI tools
+
+- **get_beds_tool.rb**: Preserve polygon area calculations, bed_type, orientation, and arch/indoor station data. Only replace the Row/Slot serialization with grid-based plant data.
+- **get_plants_tool.rb**: Keep the `bed:` and `sow_date:` output fields. Add grid position info, don't replace existing fields.
+- **draft_bed_layout_tool.rb**: Update `param :payload` description to use `grid_x/y/w/h` instead of `slot_id/from_slot_id/to_slot_id`. The plan's File Structure says "no change needed" — this is wrong.
+- **plan_committer.rb**: Preserve `counts[:plants] += 1` inside the plant creation loop.
+
+### Task 8: beds/index.erb must use @beds not @bed_data
+
+Since `GET /beds` redirects to `/garden`, the `beds/index.erb` template is only used if the redirect behavior changes. If keeping the redirect, `beds/index.erb` changes are minimal — just remove any Row/Slot references. If rendering index.erb directly (new `/beds` behavior), the template must iterate `@beds` (set by the route) with `bed.plants` for each bed.
+
+### Task 9: SVG click handler layering fix
+
+The transparent click-handler `<rect>` at the end of the SVG covers plant links. Fix: add `style="pointer-events: none;"` to the transparent rect, and add `style="pointer-events: auto;"` (or `pointer-events="painted"`) to each plant `<a>` element. This ensures plant links work while empty areas still trigger the AI drawer via a separate mechanism (e.g., click handler on the SVG element itself with target checking).
+
+### Task 10: GET /garden route MUST be updated
+
+The `GET /garden` route in `routes/beds.rb` (lines 16-36) builds `@bed_data` using `Row.where(...)`, `Slot.where(...)`. This will crash after migration. The route must be updated to build `@bed_data` using `bed.plants` instead. This is the MOST critical gap in the plan — without it the garden page is completely broken.
+
+### Task 10: garden.erb plant overlay — coordinate mapping
+
+The plant overlay JS needs to map grid coordinates to canvas pixel positions:
+```javascript
+const scaleX = bed.canvas_width / (bed.grid_cols * 10);
+const scaleY = bed.canvas_height / (bed.grid_rows * 10);
+const px = bed.canvas_x + plant.grid_x * 10 * scaleX;
+const py = bed.canvas_y + plant.grid_y * 10 * scaleY;
+const pw = plant.grid_w * 10 * scaleX;
+const ph = plant.grid_h * 10 * scaleY;
+```
+
+### Task 10: garden.erb stale JS cleanup
+
+Remove or update:
+- `slotStyle()` function (lines 609-613) — replace with `plantStyle()` using same crop-type colors
+- `newBed.rows = []` in `confirmNewBed()` (line 872) — replace with `newBed.plants = []`
+- AI drawer context banner `selectedBed.empty_count + ' empty slots'` — update to reference grid cells
