@@ -79,6 +79,31 @@
 </head>
 <body>
   <main class="max-w-4xl mx-auto px-4 py-6">
+    <% if @current_garden %>
+      <div x-data="{ open: false }" class="mb-4 flex items-center gap-2">
+        <span class="text-lg">🌱</span>
+        <span class="font-bold" style="color: var(--green-900); letter-spacing: -0.3px;">GardenOS</span>
+        <span style="color: var(--gray-400);">·</span>
+        <div class="relative">
+          <button @click="open = !open" class="flex items-center gap-1 font-semibold text-sm" style="color: var(--green-900);">
+            <%= @current_garden.name %>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div x-show="open" @click.away="open = false" x-transition
+               class="absolute left-0 mt-1 rounded-lg overflow-hidden z-50 min-w-[140px]"
+               style="background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.12); border: 1px solid #e5e7eb;">
+            <% @gardens&.each do |g| %>
+              <form method="post" action="/gardens/switch/<%= g.id %>">
+                <button type="submit" class="w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-gray-50">
+                  <%= g.name %>
+                  <% if g.id == @current_garden.id %><span style="color: var(--green-900);">✓</span><% end %>
+                </button>
+              </form>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    <% end %>
     <%= yield %>
   </main>
 
