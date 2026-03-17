@@ -10,9 +10,13 @@ class GardenScheduler
   def self.start!
     scheduler = Rufus::Scheduler.new
 
+    # Daily AI advisory — run for each garden
     scheduler.cron "30 6 * * *" do
-      puts "[#{Time.now}] Running AI advisory..."
-      AIAdvisoryService.run_daily!
+      require_relative "../models/garden"
+      Garden.all.each do |garden|
+        puts "[#{Time.now}] Running AI advisory for #{garden.name}..."
+        AIAdvisoryService.run_daily!(garden_id: garden.id)
+      end
     end
 
     scheduler.cron "0 7 * * *" do
@@ -20,9 +24,13 @@ class GardenScheduler
       NotificationService.send_morning_brief!
     end
 
+    # Task generation — run for each garden
     scheduler.cron "0 */6 * * *" do
-      puts "[#{Time.now}] Generating tasks..."
-      TaskGenerator.generate_all!
+      require_relative "../models/garden"
+      Garden.all.each do |garden|
+        puts "[#{Time.now}] Generating tasks for #{garden.name}..."
+        TaskGenerator.generate_all!(garden_id: garden.id)
+      end
     end
 
     scheduler.cron "0 */6 * * *" do

@@ -5,29 +5,31 @@ require_relative "../db/seeds/seed_varieties"
 require_relative "sensor_service"
 
 class TaskGenerator
-  def self.generate_all!
-    generate_succession_tasks!
-    generate_germination_checks!
+  def self.generate_all!(garden_id: nil)
+    generate_succession_tasks!(garden_id: garden_id)
+    generate_germination_checks!(garden_id: garden_id)
     auto_skip_watering_tasks!
   end
 
-  def self.generate_succession_tasks!
-    SuccessionPlan.all.each do |sp|
+  def self.generate_succession_tasks!(garden_id: nil)
+    plan_scope = garden_id ? SuccessionPlan.where(garden_id: garden_id) : SuccessionPlan
+    plan_scope.all.each do |sp|
       next if sp.season_end && sp.season_end < Date.today
 
-      existing = Task.where(task_type: "sow")
-                     .where(Sequel.like(:title, "%#{sp.crop}%")).count
+      task_scope = garden_id ? Task.where(garden_id: garden_id) : Task
+      existing = task_scope.where(task_type: "sow")
+                           .where(Sequel.like(:title, "%#{sp.crop}%")).count
 
       next if existing >= sp.total_planned_sowings.to_i
 
       next_date = sp.next_sowing_date(existing)
       next if next_date.nil? || next_date > Date.today + 14
 
-      already_exists = Task.where(task_type: "sow")
-                           .where(Sequel.like(:title, "%#{sp.crop}%"))
-                           .exclude(status: "done")
-                           .where(due_date: (next_date - 14)..(next_date + 14))
-                           .any?
+      already_exists = task_scope.where(task_type: "sow")
+                                 .where(Sequel.like(:title, "%#{sp.crop}%"))
+                                 .exclude(status: "done")
+                                 .where(due_date: (next_date - 14)..(next_date + 14))
+                                 .any?
       next if already_exists
 
       beds_str = sp.target_beds_list.join(", ")
@@ -43,18 +45,20 @@ class TaskGenerator
     end
   end
 
-  def self.generate_germination_checks!
-    Plant.where(lifecycle_stage: "germinating").all.each do |plant|
+  def self.generate_germination_checks!(garden_id: nil)
+    plant_scope = garden_id ? Plant.where(garden_id: garden_id) : Plant
+    plant_scope.where(lifecycle_stage: "germinating").all.each do |plant|
       days = plant.days_in_stage
       variety_info = Varieties.for(plant.crop_type)
       next unless variety_info
 
       max_days = variety_info["germination_days_max"] || 14
       if days >= (max_days * 0.5).to_i
-        already_exists = Task.where(task_type: "check")
-                             .where(Sequel.like(:title, "%#{plant.variety_name}%"))
-                             .exclude(status: "done")
-                             .any?
+        task_scope = garden_id ? Task.where(garden_id: garden_id) : Task
+        already_exists = task_scope.where(task_type: "check")
+                                   .where(Sequel.like(:title, "%#{plant.variety_name}%"))
+                                   .exclude(status: "done")
+                                   .any?
         next if already_exists
 
         Task.create(

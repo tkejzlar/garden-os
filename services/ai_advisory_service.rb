@@ -43,8 +43,9 @@ class AIAdvisoryService
     PROMPT
   end
 
-  def self.build_context
-    plants = Plant.exclude(lifecycle_stage: "done").all.map do |p|
+  def self.build_context(garden_id: nil)
+    plant_scope = garden_id ? Plant.where(garden_id: garden_id) : Plant
+    plants = plant_scope.exclude(lifecycle_stage: "done").all.map do |p|
       harvest_rows = Harvest.where(plant_id: p.id).all
       harvest_counts = harvest_rows.group_by(&:quantity).transform_values(&:count)
       total_harvests = harvest_rows.count
@@ -60,8 +61,9 @@ class AIAdvisoryService
       }
     end
 
-    tasks = Task.where(due_date: Date.today..(Date.today + 7))
-                .exclude(status: "done").all.map do |t|
+    task_scope = garden_id ? Task.where(garden_id: garden_id) : Task
+    tasks = task_scope.where(due_date: Date.today..(Date.today + 7))
+                      .exclude(status: "done").all.map do |t|
       { title: t.title, type: t.task_type, due: t.due_date.to_s }
     end
 
@@ -87,8 +89,8 @@ class AIAdvisoryService
     end
   end
 
-  def self.run_daily!
-    context = build_context
+  def self.run_daily!(garden_id: nil)
+    context = build_context(garden_id: garden_id)
 
     chat = RubyLLM.chat(model: model_id, provider: provider, assume_model_exists: true)
       .with_instructions(system_prompt)
@@ -108,6 +110,7 @@ class AIAdvisoryService
       end
 
       Advisory.create(
+        garden_id: garden_id,
         date: Date.today,
         advisory_type: adv[:type],
         content: JSON.generate(adv),
