@@ -1,3 +1,4 @@
+require "json"
 require_relative "../config/database"
 
 class PlannerMessage < Sequel::Model
