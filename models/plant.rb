@@ -4,7 +4,7 @@ require_relative "harvest"
 
 class Plant < Sequel::Model
   many_to_one :garden
-  many_to_one :slot
+  many_to_one :bed
   many_to_one :indoor_station
   one_to_many :stage_histories
   one_to_many :harvests

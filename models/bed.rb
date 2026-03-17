@@ -1,39 +1,36 @@
-require_relative "../config/database"
 require "json"
+require_relative "../config/database"
 
 class Bed < Sequel::Model
   many_to_one :garden
-  one_to_many :rows
+  one_to_many :plants
 
-  # Returns parsed [[x,y],…] array, or [] when the bed is a rectangle / unplaced.
-  def canvas_points_array
-    canvas_points ? JSON.parse(canvas_points) : []
+  def grid_cols
+    (((width || 100).to_f) / 10.0).ceil.clamp(1, 50)
   end
 
-  # Accepts an array of [x,y] pairs and serialises to JSON.
+  def grid_rows
+    (((length || 100).to_f) / 10.0).ceil.clamp(1, 50)
+  end
+
+  def canvas_points_array
+    return [] unless canvas_points
+    JSON.parse(canvas_points)
+  rescue JSON::ParserError
+    []
+  end
+
   def canvas_points_array=(pts)
     self.canvas_points = pts.nil? || pts.empty? ? nil : pts.to_json
   end
 
-  # True when the bed has been placed on the canvas.
   def placed?
     !canvas_x.nil?
   end
 
-  # True when this bed is a polygon rather than a rectangle.
   def polygon?
     !canvas_points.nil?
   end
-end
-
-class Row < Sequel::Model
-  many_to_one :bed
-  one_to_many :slots
-end
-
-class Slot < Sequel::Model
-  many_to_one :row
-  one_to_many :plants
 end
 
 class Arch < Sequel::Model
