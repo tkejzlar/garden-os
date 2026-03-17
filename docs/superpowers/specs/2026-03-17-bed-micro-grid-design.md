@@ -88,13 +88,14 @@ Single migration that:
 ```ruby
 Sequel.migration do
   up do
-    # Add grid columns
+    # Add grid columns and bed FK
     alter_table(:plants) do
       add_column :grid_x, Integer
       add_column :grid_y, Integer
       add_column :grid_w, Integer, default: 1
       add_column :grid_h, Integer, default: 1
       add_column :quantity, Integer, default: 1
+      add_foreign_key :bed_id, :beds, on_delete: :set_null
     end
 
     # Clear slot assignments (clean break)
@@ -129,12 +130,14 @@ Sequel.migration do
 
     alter_table(:plants) do
       add_foreign_key :slot_id, :slots, on_delete: :set_null
+      drop_foreign_key :bed_id
       drop_column :grid_x
       drop_column :grid_y
       drop_column :grid_w
       drop_column :grid_h
       drop_column :quantity
     end
+    # Note: rollback is destructive — no plant position data is restored
   end
 end
 ```
@@ -159,36 +162,13 @@ class Bed < Sequel::Model
     (((length || 100).to_f) / 10.0).ceil.clamp(1, 50)
   end
 
-  # Plants placed on this bed (have grid_x set and belong to same garden)
-  def placed_plants
-    Plant.where(garden_id: garden_id)
-         .exclude(grid_x: nil)
-         .all
-         .select { |p| plant_on_bed?(p) }
-  end
+  one_to_many :plants  # plants placed on this bed via bed_id FK
 end
-```
-
-Note: Since plants don't have a direct `bed_id` foreign key, we need a way to know which bed a plant is on. Two approaches:
-
-**Option A:** Add `bed_id` to Plant (simple FK). This is the recommended approach.
-**Option B:** Infer from grid position + garden context. Fragile.
-
-**Decision: Add `bed_id` to Plant** in the same migration. This replaces `slot_id` as the bed association.
-
-Updated migration adds:
-```ruby
-add_foreign_key :bed_id, :beds, on_delete: :set_null
-```
-
-Updated Bed model:
-```ruby
-one_to_many :plants  # plants placed on this bed
 ```
 
 Updated Plant model:
 ```ruby
-many_to_one :bed
+many_to_one :bed  # replaces many_to_one :slot
 ```
 
 ### Row/Slot Models
@@ -238,11 +218,17 @@ Each bed card renders an inline SVG showing the micro-grid:
 | `views/succession.erb` | Rewrite Beds tab SVG to use micro-grid rendering |
 | `routes/succession.rb` | Update bed-timeline API, swap-slots endpoint, apply-layout endpoint for new model |
 | `routes/plants.rb` | Update PATCH /plants/:id for grid placement instead of slot_id |
-| `routes/beds.rb` | Update bed show/index if they reference rows/slots |
+| `routes/beds.rb` | Full update: index builds bed data from `bed.plants` not rows/slots, show renders grid not row/slot lists, JSON API returns grid dimensions |
+| `views/beds/index.erb` | Replace slot-based rendering with grid-based plant display |
+| `views/beds/show.erb` | Full rewrite: replace row/slot iteration with micro-grid SVG (same renderer as succession.erb Beds tab) |
+| `views/garden.erb` | Update canvas plant markers: replace `bed.rows`/`row.slots` iteration with `bed.plants` grid-based rendering, remove "Edit rows & slots" links |
 | `services/planner_tools/draft_bed_layout_tool.rb` | Update payload to use grid coordinates |
 | `services/planner_tools/get_beds_tool.rb` | Update to return grid dimensions instead of row/slot counts |
 | `services/plan_committer.rb` | Update plant creation to use bed_id + grid coords instead of slot assignment |
-| `test/**/*` | Update all tests that create Row/Slot objects |
+| `test/routes/test_succession.rb` | Update bed-timeline and swap/layout tests to use grid model |
+| `test/routes/test_plants.rb` | Update move test to use bed_id + grid coords instead of slot_id |
+| `test/routes/test_beds.rb` | Update to not create Row/Slot |
+| `test/routes/test_planner_routes.rb` | Update: creates Row/Slot objects that need to be removed |
 
 ### New Files
 
