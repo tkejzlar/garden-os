@@ -27,16 +27,20 @@ class PlanCommitter
         bed = Bed.where(name: bed_name).first
         next unless bed
 
-        # Auto-place plants on bed grid
+        # Auto-place plants on bed grid using crop spacing presets
         existing_plants = Plant.where(bed_id: bed.id).exclude(lifecycle_stage: "done").all
         next_y = existing_plants.any? ? existing_plants.map { |p| (p.grid_y || 0) + (p.grid_h || 1) }.max : 0
-        grid_w = 3  # Default: 30cm
-        grid_h = 3
+        cursor_x = 0
 
         assignments_for_bed = bed_assignments
-        assignments_for_bed.each_with_index do |a, i|
-          grid_x = (i % [bed.grid_cols / grid_w, 1].max) * grid_w
-          grid_y = next_y + (i / [bed.grid_cols / grid_w, 1].max) * grid_h
+        assignments_for_bed.each do |a|
+          gw, gh = Plant.default_grid_size(a["crop_type"])
+
+          # Wrap to next row if we'd exceed bed width
+          if cursor_x + gw > bed.grid_cols
+            cursor_x = 0
+            next_y += gh
+          end
 
           Plant.create(
             garden_id: garden_id,
@@ -45,13 +49,14 @@ class PlanCommitter
             crop_type: a["crop_type"],
             source: a["source"],
             lifecycle_stage: "seed_packet",
-            grid_x: grid_x.clamp(0, bed.grid_cols - 1),
-            grid_y: grid_y.clamp(0, bed.grid_rows - 1),
-            grid_w: grid_w,
-            grid_h: grid_h,
+            grid_x: cursor_x.clamp(0, bed.grid_cols - 1),
+            grid_y: next_y.clamp(0, bed.grid_rows - 1),
+            grid_w: gw,
+            grid_h: gh,
             quantity: a["quantity"]&.to_i || 1
           )
           counts[:plants] += 1
+          cursor_x += gw
         end
       end
 

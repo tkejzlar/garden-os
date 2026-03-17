@@ -11,6 +11,33 @@ class Plant < Sequel::Model
   one_to_many :photos
   many_to_many :tasks
 
+  # Default grid sizes per crop type (in 10cm cells)
+  CROP_SPACING = {
+    "tomato"    => [4, 4],  # 40×40cm
+    "pepper"    => [3, 3],  # 30×30cm
+    "eggplant"  => [4, 4],  # 40×40cm
+    "lettuce"   => [2, 2],  # 20×20cm
+    "spinach"   => [2, 2],
+    "chard"     => [3, 3],
+    "kale"      => [3, 3],
+    "herb"      => [2, 2],  # 20×20cm
+    "basil"     => [2, 2],
+    "cucumber"  => [3, 4],  # 30×40cm
+    "squash"    => [4, 4],
+    "zucchini"  => [4, 4],
+    "melon"     => [4, 4],
+    "flower"    => [2, 2],
+    "radish"    => [1, 1],  # 10×10cm (dense)
+    "carrot"    => [1, 1],
+    "onion"     => [1, 1],
+    "bean"      => [2, 3],
+    "pea"       => [2, 3],
+  }.freeze
+
+  def self.default_grid_size(crop_type)
+    CROP_SPACING[crop_type.to_s.downcase] || [2, 2]
+  end
+
   LIFECYCLE_STAGES = %w[
     seed_packet pre_treating sown_indoor germinating seedling
     potted_up hardening_off planted_out producing done stratifying
