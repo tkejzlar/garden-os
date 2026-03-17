@@ -257,6 +257,7 @@ Context-aware slide-up drawer triggered by the floating action button (✦).
 - Green circular FAB, 44px, bottom-right corner, always visible
 - Tap → drawer slides up from bottom (80-85% viewport height)
 - Swipe down or tap backdrop → dismisses
+- Switching tabs while drawer is open: drawer stays open, context banner updates to reflect the new tab
 
 ### Context Assembly
 
@@ -399,3 +400,4 @@ User taps ✦ FAB
 - **Earthy & Warm palette** — existing CSS variables from layout.erb
 - **Progressive enhancement** — timeline data fetched lazily, tasks tab works immediately
 - **Existing test suite** — all 32 tests must pass (pure view changes shouldn't break)
+- **Empty states** — each tab shows a helpful message when no data exists (e.g., "No plantings yet — use the AI planner to get started")
