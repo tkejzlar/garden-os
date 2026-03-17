@@ -90,6 +90,7 @@ class GardenApp
 
   post "/succession/plans" do
     plan = SuccessionPlan.create(
+      garden_id:             @current_garden.id,
       crop:                  params[:crop].to_s.strip,
       varieties:             params[:varieties].to_s.split(",").map(&:strip).to_json,
       interval_days:         params[:interval_days].to_i,
@@ -140,6 +141,7 @@ class GardenApp
 
   post "/succession/tasks" do
     Task.create(
+      garden_id: @current_garden.id,
       title:     params[:title].to_s.strip,
       task_type: params[:task_type] || "sow",
       due_date:  params[:due_date].to_s.strip.then { |v| v.empty? ? nil : Date.parse(v) },
@@ -258,7 +260,7 @@ class GardenApp
     halt 400, json(error: "draft_payload required") unless draft.is_a?(Hash)
 
     require_relative "../services/plan_committer"
-    result = PlanCommitter.commit!(draft)
+    result = PlanCommitter.commit!(draft, garden_id: @current_garden.id)
     json result
   end
 

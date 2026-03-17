@@ -1,4 +1,3 @@
-# test/test_helper.rb
 ENV["RACK_ENV"] = "test"
 ENV["DATABASE_URL"] = "sqlite://db/garden_os_test.db"
 
@@ -10,6 +9,8 @@ if Dir["db/migrations/*.rb"].any?
   Sequel::Migrator.run(DB, "db/migrations", allow_missing_migration_files: true)
 end
 
+require_relative "../models/garden"
+
 class GardenTest < Minitest::Test
   include Rack::Test::Methods
 
@@ -18,7 +19,8 @@ class GardenTest < Minitest::Test
   end
 
   def setup
-    # Clean all tables before each test
     DB.tables.each { |t| DB[t].delete unless [:schema_migrations, :schema_info].include?(t) }
+    @garden = Garden.create(name: "Test Garden", created_at: Time.now)
+    set_cookie "garden_id=#{@garden.id}"
   end
 end

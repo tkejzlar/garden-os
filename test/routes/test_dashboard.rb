@@ -10,17 +10,18 @@ class TestDashboard < GardenTest
 
   def test_dashboard_shows_todays_tasks
     Task.create(title: "Sow lettuce", task_type: "sow",
-                due_date: Date.today, status: "upcoming")
+                due_date: Date.today, status: "upcoming", garden_id: @garden.id)
     get "/"
     assert_includes last_response.body, "Sow lettuce"
   end
 
   def test_dashboard_shows_germination_watch
-    station = IndoorStation.create(name: "Heat mat", station_type: "heat_mat")
+    station = IndoorStation.create(name: "Heat mat", station_type: "heat_mat", garden_id: @garden.id)
     plant = Plant.create(variety_name: "Raf", crop_type: "tomato",
                          lifecycle_stage: "germinating",
                          indoor_station_id: station.id,
-                         sow_date: Date.today - 5)
+                         sow_date: Date.today - 5,
+                         garden_id: @garden.id)
     StageHistory.create(plant_id: plant.id, to_stage: "germinating",
                         changed_at: Time.now - (5 * 86400))
     get "/"

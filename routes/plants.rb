@@ -81,6 +81,7 @@ class GardenApp
   post "/api/plants" do
     data = JSON.parse(request.body.read)
     plant = Plant.create(
+      garden_id: @current_garden.id,
       variety_name: data["variety_name"],
       crop_type: data["crop_type"],
       source: data["source"],

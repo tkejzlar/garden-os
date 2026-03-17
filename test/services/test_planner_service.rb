@@ -9,13 +9,13 @@ class TestPlannerService < GardenTest
 
   def test_saves_user_message
     PlannerService.new  # ensure message table exists
-    PlannerMessage.create(role: "user", content: "test", created_at: Time.now)
+    PlannerMessage.create(role: "user", content: "test", created_at: Time.now, garden_id: @garden.id)
     assert_equal 1, PlannerMessage.where(role: "user").count
   end
 
   def test_clear_messages
-    PlannerMessage.create(role: "user", content: "test", created_at: Time.now)
-    PlannerMessage.create(role: "assistant", content: "reply", created_at: Time.now)
+    PlannerMessage.create(role: "user", content: "test", created_at: Time.now, garden_id: @garden.id)
+    PlannerMessage.create(role: "assistant", content: "reply", created_at: Time.now, garden_id: @garden.id)
     PlannerMessage.dataset.delete
     assert_equal 0, PlannerMessage.count
   end

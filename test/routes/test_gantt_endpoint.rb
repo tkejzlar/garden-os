@@ -8,7 +8,8 @@ class TestGanttEndpoint < GardenTest
       crop: "Spinach", varieties: '["Matador"]',
       interval_days: 14, total_planned_sowings: 3,
       season_start: Date.today, season_end: Date.today + 42,
-      target_beds: '["BB3"]'
+      target_beds: '["BB3"]',
+      garden_id: @garden.id
     )
   end
 
@@ -39,7 +40,7 @@ class TestGanttEndpoint < GardenTest
 
   def test_bar_color_done_is_green
     task = Task.create(title: "Sow Spinach #1", task_type: "sow",
-                       due_date: Date.today - 7, status: "done")
+                       due_date: Date.today - 7, status: "done", garden_id: @garden.id)
     get "/api/succession/gantt"
     body = JSON.parse(last_response.body)
     bar = body["plans"].first["bars"].first
@@ -49,7 +50,7 @@ class TestGanttEndpoint < GardenTest
 
   def test_bar_color_upcoming_within_7_days_is_amber
     Task.create(title: "Sow Spinach #1", task_type: "sow",
-                due_date: Date.today + 3, status: "upcoming")
+                due_date: Date.today + 3, status: "upcoming", garden_id: @garden.id)
     get "/api/succession/gantt"
     body = JSON.parse(last_response.body)
     bar = body["plans"].first["bars"].first
@@ -58,7 +59,7 @@ class TestGanttEndpoint < GardenTest
 
   def test_bar_color_future_is_gray
     Task.create(title: "Sow Spinach #1", task_type: "sow",
-                due_date: Date.today + 20, status: "upcoming")
+                due_date: Date.today + 20, status: "upcoming", garden_id: @garden.id)
     get "/api/succession/gantt"
     body = JSON.parse(last_response.body)
     bar = body["plans"].first["bars"].first
@@ -67,9 +68,9 @@ class TestGanttEndpoint < GardenTest
 
   def test_bar_label_is_indexed
     Task.create(title: "Sow Spinach #1", task_type: "sow",
-                due_date: Date.today + 14, status: "upcoming")
+                due_date: Date.today + 14, status: "upcoming", garden_id: @garden.id)
     Task.create(title: "Sow Spinach #2", task_type: "sow",
-                due_date: Date.today + 28, status: "upcoming")
+                due_date: Date.today + 28, status: "upcoming", garden_id: @garden.id)
     get "/api/succession/gantt"
     body = JSON.parse(last_response.body)
     bars = body["plans"].first["bars"]

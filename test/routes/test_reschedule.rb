@@ -4,7 +4,7 @@ require_relative "../../app"
 class TestReschedule < GardenTest
   def test_reschedule_updates_due_date
     task = Task.create(title: "Sow lettuce #1", task_type: "sow",
-                       due_date: Date.today, status: "upcoming")
+                       due_date: Date.today, status: "upcoming", garden_id: @garden.id)
     patch "/tasks/#{task.id}/reschedule", due_date: (Date.today + 7).to_s
     assert_equal 200, last_response.status
     body = JSON.parse(last_response.body)
@@ -19,14 +19,14 @@ class TestReschedule < GardenTest
 
   def test_reschedule_422_without_date
     task = Task.create(title: "Sow lettuce #2", task_type: "sow",
-                       due_date: Date.today, status: "upcoming")
+                       due_date: Date.today, status: "upcoming", garden_id: @garden.id)
     patch "/tasks/#{task.id}/reschedule"
     assert_equal 422, last_response.status
   end
 
   def test_reschedule_422_with_invalid_date
     task = Task.create(title: "Sow lettuce #3", task_type: "sow",
-                       due_date: Date.today, status: "upcoming")
+                       due_date: Date.today, status: "upcoming", garden_id: @garden.id)
     patch "/tasks/#{task.id}/reschedule", due_date: "not-a-date"
     assert_equal 422, last_response.status
   end
@@ -36,10 +36,11 @@ class TestReschedule < GardenTest
       crop: "Basil", varieties: '["Genovese"]',
       interval_days: 14, total_planned_sowings: 4,
       season_start: Date.today, season_end: Date.today + 56,
-      target_beds: '["BB2"]'
+      target_beds: '["BB2"]',
+      garden_id: @garden.id
     )
     task = Task.create(title: "Sow Basil #1", task_type: "sow",
-                       due_date: Date.today, status: "upcoming")
+                       due_date: Date.today, status: "upcoming", garden_id: @garden.id)
     original_interval = plan.interval_days
     patch "/tasks/#{task.id}/reschedule", due_date: (Date.today + 3).to_s
     assert_equal 200, last_response.status
@@ -52,7 +53,7 @@ class TestMarkDoneViaTaskRoute < GardenTest
   # which is the existing task-complete route. Verify it still works.
   def test_mark_done_via_existing_complete_route
     task = Task.create(title: "Sow Tomato #1", task_type: "sow",
-                       due_date: Date.today, status: "upcoming")
+                       due_date: Date.today, status: "upcoming", garden_id: @garden.id)
     post "/tasks/#{task.id}/complete"
     # Route returns 302 redirect; task should be done
     assert_includes [200, 302], last_response.status

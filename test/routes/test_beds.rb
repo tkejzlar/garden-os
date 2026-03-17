@@ -3,24 +3,24 @@ require_relative "../../app"
 
 class TestBeds < GardenTest
   def test_beds_index_redirects_to_garden
-    Bed.create(name: "BB1", bed_type: "raised")
+    Bed.create(name: "BB1", bed_type: "raised", garden_id: @garden.id)
     get "/beds"
     assert_equal 301, last_response.status
     assert_includes last_response.headers["Location"], "/garden"
   end
 
   def test_bed_show_with_plants
-    bed = Bed.create(name: "BB1", bed_type: "raised")
+    bed = Bed.create(name: "BB1", bed_type: "raised", garden_id: @garden.id)
     row = Row.create(bed_id: bed.id, name: "Row A", position: 1)
     slot = Slot.create(row_id: row.id, name: "Pos 1", position: 1)
-    Plant.create(variety_name: "Raf", crop_type: "tomato", slot_id: slot.id)
+    Plant.create(variety_name: "Raf", crop_type: "tomato", slot_id: slot.id, garden_id: @garden.id)
     get "/beds/#{bed.id}"
     assert_equal 200, last_response.status
     assert_includes last_response.body, "Raf"
   end
 
   def test_beds_api
-    Bed.create(name: "BB1", bed_type: "raised")
+    Bed.create(name: "BB1", bed_type: "raised", garden_id: @garden.id)
     get "/api/beds"
     assert_equal 200, last_response.status
     data = JSON.parse(last_response.body)

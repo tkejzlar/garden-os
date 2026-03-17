@@ -4,7 +4,7 @@ require_relative "../../services/ai_advisory_service"
 class TestAIAdvisoryService < GardenTest
   def test_builds_context_payload
     Plant.create(variety_name: "Raf", crop_type: "tomato", lifecycle_stage: "germinating",
-                 sow_date: Date.today - 5)
+                 sow_date: Date.today - 5, garden_id: @garden.id)
 
     context = AIAdvisoryService.build_context
     assert context.key?(:plants)
@@ -42,7 +42,7 @@ class TestAIAdvisoryService < GardenTest
   end
 
   def test_build_context_includes_harvest_counts
-    plant = Plant.create(variety_name: "Marmande", crop_type: "tomato", lifecycle_stage: "producing")
+    plant = Plant.create(variety_name: "Marmande", crop_type: "tomato", lifecycle_stage: "producing", garden_id: @garden.id)
     Harvest.create(plant_id: plant.id, date: Date.today, quantity: "large")
     Harvest.create(plant_id: plant.id, date: Date.today, quantity: "large")
     Harvest.create(plant_id: plant.id, date: Date.today, quantity: "small")

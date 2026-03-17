@@ -10,7 +10,7 @@ class TestPlannerRoutes < GardenTest
   end
 
   def test_delete_messages
-    PlannerMessage.create(role: "user", content: "test", created_at: Time.now)
+    PlannerMessage.create(role: "user", content: "test", created_at: Time.now, garden_id: @garden.id)
     delete "/succession/planner/messages"
     assert_equal 200, last_response.status
     assert_equal 0, PlannerMessage.count
@@ -27,7 +27,7 @@ class TestPlannerRoutes < GardenTest
   end
 
   def test_commit_creates_records
-    bed = Bed.create(name: "BB1", bed_type: "raised")
+    bed = Bed.create(name: "BB1", bed_type: "raised", garden_id: @garden.id)
     row = Row.create(bed_id: bed.id, name: "A", position: 1)
     Slot.create(row_id: row.id, name: "Pos1", position: 1)
 

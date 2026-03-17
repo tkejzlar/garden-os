@@ -10,7 +10,7 @@ class TestPlant < GardenTest
   ].freeze
 
   def test_advance_stage
-    plant = Plant.create(variety_name: "Raf", crop_type: "tomato", lifecycle_stage: "seed_packet")
+    plant = Plant.create(variety_name: "Raf", crop_type: "tomato", lifecycle_stage: "seed_packet", garden_id: @garden.id)
     plant.advance_stage!("sown_indoor")
 
     assert_equal "sown_indoor", plant.reload.lifecycle_stage
@@ -20,12 +20,12 @@ class TestPlant < GardenTest
   end
 
   def test_advance_stage_rejects_invalid
-    plant = Plant.create(variety_name: "Raf", crop_type: "tomato", lifecycle_stage: "seed_packet")
+    plant = Plant.create(variety_name: "Raf", crop_type: "tomato", lifecycle_stage: "seed_packet", garden_id: @garden.id)
     assert_raises(ArgumentError) { plant.advance_stage!("bogus") }
   end
 
   def test_days_in_stage
-    plant = Plant.create(variety_name: "Raf", crop_type: "tomato", lifecycle_stage: "germinating")
+    plant = Plant.create(variety_name: "Raf", crop_type: "tomato", lifecycle_stage: "germinating", garden_id: @garden.id)
     StageHistory.create(plant_id: plant.id, to_stage: "germinating",
                         changed_at: Time.now - (5 * 86400))
     assert_equal 5, plant.days_in_stage

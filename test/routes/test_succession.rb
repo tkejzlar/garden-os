@@ -9,7 +9,8 @@ class TestSuccession < GardenTest
 
   def test_succession_page_includes_alpine_component
     SuccessionPlan.create(crop: "Lettuce", varieties: '["Tre Colori"]',
-                          interval_days: 18, total_planned_sowings: 8)
+                          interval_days: 18, total_planned_sowings: 8,
+                          garden_id: @garden.id)
     get "/succession"
     assert_includes last_response.body, "x-data=\"gantt()\""
   end
@@ -18,7 +19,8 @@ class TestSuccession < GardenTest
     SuccessionPlan.create(crop: "Lettuce", varieties: '["Tre Colori"]',
                           interval_days: 18, total_planned_sowings: 8,
                           season_start: Date.today, season_end: Date.today + 90,
-                          target_beds: '["BB1"]')
+                          target_beds: '["BB1"]',
+                          garden_id: @garden.id)
     get "/api/succession"
     assert_equal 200, last_response.status
     body = JSON.parse(last_response.body)

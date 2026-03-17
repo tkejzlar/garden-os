@@ -5,7 +5,7 @@ require "tempfile"
 class TestPhotos < GardenTest
   def setup
     super
-    @plant = Plant.create(variety_name: "Raf", crop_type: "tomato", lifecycle_stage: "seedling")
+    @plant = Plant.create(variety_name: "Raf", crop_type: "tomato", lifecycle_stage: "seedling", garden_id: @garden.id)
     # Point upload root to a temp directory so tests never touch public/
     @tmp_dir = Dir.mktmpdir("garden_photos_test")
     Photo.send(:remove_const, :UPLOAD_ROOT) rescue nil

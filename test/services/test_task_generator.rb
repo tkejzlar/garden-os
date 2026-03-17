@@ -22,7 +22,8 @@ class TestTaskGenerator < GardenTest
       crop: "Lettuce", varieties: '["Tre Colori"]',
       interval_days: 18, season_start: Date.today - 20,
       season_end: Date.today + 90, target_beds: '["BB1"]',
-      total_planned_sowings: 8
+      total_planned_sowings: 8,
+      garden_id: @garden.id
     )
 
     TaskGenerator.generate_succession_tasks!
@@ -33,7 +34,8 @@ class TestTaskGenerator < GardenTest
 
   def test_generates_germination_check_tasks
     Plant.create(variety_name: "Raf", crop_type: "tomato",
-                 lifecycle_stage: "germinating", sow_date: Date.today - 7)
+                 lifecycle_stage: "germinating", sow_date: Date.today - 7,
+                 garden_id: @garden.id)
     StageHistory.create(plant_id: Plant.first.id, to_stage: "germinating",
                         changed_at: Time.now - (7 * 86400))
 
@@ -44,12 +46,13 @@ class TestTaskGenerator < GardenTest
 
   def test_no_duplicate_tasks
     Task.create(title: "Sow Lettuce #2", task_type: "sow",
-                due_date: Date.today + 3, status: "upcoming")
+                due_date: Date.today + 3, status: "upcoming", garden_id: @garden.id)
     sp = SuccessionPlan.create(
       crop: "Lettuce", varieties: '["Tre Colori"]',
       interval_days: 18, season_start: Date.today - 20,
       season_end: Date.today + 90, target_beds: '["BB1"]',
-      total_planned_sowings: 8
+      total_planned_sowings: 8,
+      garden_id: @garden.id
     )
 
     TaskGenerator.generate_succession_tasks!
@@ -63,7 +66,8 @@ class TestTaskGenerator < GardenTest
   def test_auto_skip_watering_tasks_skips_when_rain_detected
     require_relative "../../services/sensor_service"
     task = Task.create(title: "Water tomatoes", task_type: "water",
-                       due_date: Date.today, status: "upcoming", priority: "should")
+                       due_date: Date.today, status: "upcoming", priority: "should",
+                       garden_id: @garden.id)
 
     SensorService.stub(:rain_detected?, true) do
       SensorService.stub(:irrigation_active?, false) do
@@ -79,7 +83,8 @@ class TestTaskGenerator < GardenTest
   def test_auto_skip_watering_tasks_skips_when_irrigation_active
     require_relative "../../services/sensor_service"
     task = Task.create(title: "Water herbs", task_type: "water",
-                       due_date: Date.today, status: "upcoming", priority: "should")
+                       due_date: Date.today, status: "upcoming", priority: "should",
+                       garden_id: @garden.id)
 
     SensorService.stub(:rain_detected?, false) do
       SensorService.stub(:irrigation_active?, true) do
@@ -95,7 +100,8 @@ class TestTaskGenerator < GardenTest
   def test_auto_skip_watering_tasks_does_not_skip_when_no_conditions
     require_relative "../../services/sensor_service"
     task = Task.create(title: "Water seedlings", task_type: "water",
-                       due_date: Date.today, status: "upcoming", priority: "should")
+                       due_date: Date.today, status: "upcoming", priority: "should",
+                       garden_id: @garden.id)
 
     SensorService.stub(:rain_detected?, false) do
       SensorService.stub(:irrigation_active?, false) do
@@ -110,7 +116,8 @@ class TestTaskGenerator < GardenTest
   def test_auto_skip_watering_tasks_does_not_touch_done_tasks
     require_relative "../../services/sensor_service"
     task = Task.create(title: "Water beds", task_type: "water",
-                       due_date: Date.today, status: "done", priority: "should")
+                       due_date: Date.today, status: "done", priority: "should",
+                       garden_id: @garden.id)
 
     SensorService.stub(:rain_detected?, true) do
       SensorService.stub(:irrigation_active?, false) do
@@ -125,7 +132,8 @@ class TestTaskGenerator < GardenTest
   def test_auto_skip_does_not_affect_non_water_tasks
     require_relative "../../services/sensor_service"
     task = Task.create(title: "Sow Lettuce #1", task_type: "sow",
-                       due_date: Date.today, status: "upcoming", priority: "should")
+                       due_date: Date.today, status: "upcoming", priority: "should",
+                       garden_id: @garden.id)
 
     SensorService.stub(:rain_detected?, true) do
       SensorService.stub(:irrigation_active?, false) do

@@ -5,7 +5,7 @@ class TestPlanCommitter < GardenTest
   def setup
     super
     # Create a bed with rows and slots for testing
-    @bed = Bed.create(name: "BB1", bed_type: "raised")
+    @bed = Bed.create(name: "BB1", bed_type: "raised", garden_id: @garden.id)
     row = Row.create(bed_id: @bed.id, name: "A", position: 1)
     Slot.create(row_id: row.id, name: "Pos 1", position: 1)
     Slot.create(row_id: row.id, name: "Pos 2", position: 2)
@@ -20,7 +20,7 @@ class TestPlanCommitter < GardenTest
       "successions" => [],
       "tasks" => []
     }
-    result = PlanCommitter.commit!(draft)
+    result = PlanCommitter.commit!(draft, garden_id: @garden.id)
     assert result[:success]
     assert_equal 1, result[:created][:plants]
     assert_equal "Raf", Plant.first.variety_name
@@ -37,7 +37,7 @@ class TestPlanCommitter < GardenTest
       ],
       "tasks" => []
     }
-    result = PlanCommitter.commit!(draft)
+    result = PlanCommitter.commit!(draft, garden_id: @garden.id)
     assert result[:success]
     assert_equal 1, result[:created][:succession_plans]
     assert_equal "Lettuce", SuccessionPlan.first.crop
@@ -53,7 +53,7 @@ class TestPlanCommitter < GardenTest
           "related_beds" => ["BB1"] }
       ]
     }
-    result = PlanCommitter.commit!(draft)
+    result = PlanCommitter.commit!(draft, garden_id: @garden.id)
     assert result[:success]
     assert_equal 1, result[:created][:tasks]
     assert_equal "Sow peppers", Task.first.title
@@ -67,13 +67,13 @@ class TestPlanCommitter < GardenTest
       "successions" => [],
       "tasks" => []
     }
-    result = PlanCommitter.commit!(draft)
+    result = PlanCommitter.commit!(draft, garden_id: @garden.id)
     refute result[:success]
     assert_includes result[:errors].first, "NONEXISTENT"
   end
 
   def test_empty_draft
-    result = PlanCommitter.commit!({ "assignments" => [], "successions" => [], "tasks" => [] })
+    result = PlanCommitter.commit!({ "assignments" => [], "successions" => [], "tasks" => [] }, garden_id: @garden.id)
     assert result[:success]
     assert_equal 0, Plant.count
   end

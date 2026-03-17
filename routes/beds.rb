@@ -83,7 +83,7 @@ class GardenApp
     name = body["name"].to_s.strip
     halt 422, json(error: "name is required") if name.empty?
 
-    attrs = { name: name }
+    attrs = { name: name, garden_id: @current_garden.id }
     attrs[:bed_type]      = body["bed_type"]      if body.key?("bed_type")
     attrs[:canvas_x]      = body["canvas_x"]&.to_f
     attrs[:canvas_y]      = body["canvas_y"]&.to_f

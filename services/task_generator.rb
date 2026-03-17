@@ -32,6 +32,7 @@ class TaskGenerator
 
       beds_str = sp.target_beds_list.join(", ")
       Task.create(
+        garden_id: sp.garden_id,
         title: "Sow #{sp.crop} ##{existing + 1} — #{beds_str}",
         task_type: "sow",
         due_date: next_date,
@@ -57,6 +58,7 @@ class TaskGenerator
         next if already_exists
 
         Task.create(
+          garden_id: plant.garden_id,
           title: "Check #{plant.variety_name} — day #{days} germinating",
           task_type: "check",
           due_date: Date.today,
@@ -102,6 +104,7 @@ class TaskGenerator
       next if already_exists
 
       Task.create(
+        garden_id: sp.garden_id,
         title: "Sow #{sp.crop} ##{i + 1} — #{beds_str}",
         task_type: "sow",
         due_date: next_date,

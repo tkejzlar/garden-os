@@ -20,7 +20,8 @@ class TestPlanCrud < GardenTest
 
   def test_update_plan
     plan = SuccessionPlan.create(crop: "Lettuce", varieties: '["Tre Colori"]',
-                                 interval_days: 18, total_planned_sowings: 8)
+                                 interval_days: 18, total_planned_sowings: 8,
+                                 garden_id: @garden.id)
     patch "/succession/plans/#{plan.id}", { interval_days: "21" }
     assert_equal 302, last_response.status
     assert_equal 21, plan.reload.interval_days
@@ -28,7 +29,8 @@ class TestPlanCrud < GardenTest
 
   def test_delete_plan
     plan = SuccessionPlan.create(crop: "Lettuce", varieties: '["Tre Colori"]',
-                                 interval_days: 18, total_planned_sowings: 8)
+                                 interval_days: 18, total_planned_sowings: 8,
+                                 garden_id: @garden.id)
     delete "/succession/plans/#{plan.id}"
     assert_equal 302, last_response.status
     assert_equal 0, SuccessionPlan.count
@@ -39,7 +41,8 @@ class TestPlanCrud < GardenTest
       crop: "Lettuce", varieties: '["Tre Colori"]',
       interval_days: 18, season_start: Date.today,
       season_end: Date.today + 90, target_beds: '["BB1"]',
-      total_planned_sowings: 4
+      total_planned_sowings: 4,
+      garden_id: @garden.id
     )
     post "/succession/plans/#{plan.id}/generate"
     assert_equal 302, last_response.status
@@ -65,7 +68,8 @@ class TestPlanCrud < GardenTest
 
   def test_get_edit_plan_form
     plan = SuccessionPlan.create(crop: "Lettuce", varieties: '["Tre Colori"]',
-                                 interval_days: 18, total_planned_sowings: 8)
+                                 interval_days: 18, total_planned_sowings: 8,
+                                 garden_id: @garden.id)
     get "/succession/plans/#{plan.id}/edit"
     assert_equal 200, last_response.status
     assert_includes last_response.body, "Lettuce"

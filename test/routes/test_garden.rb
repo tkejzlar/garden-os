@@ -7,7 +7,7 @@ class TestGarden < GardenTest
   # ── GET /garden ──────────────────────────────────────────────────────────────
 
   def test_garden_page_renders
-    Bed.create(name: "North Bed", bed_type: "raised")
+    Bed.create(name: "North Bed", bed_type: "raised", garden_id: @garden.id)
     get "/garden"
     assert_equal 200, last_response.status
     assert_includes last_response.body, "North Bed"
@@ -65,7 +65,7 @@ class TestGarden < GardenTest
   # ── PATCH /api/beds/:id/position ─────────────────────────────────────────────
 
   def test_patch_position_updates_canvas_fields
-    bed = Bed.create(name: "West Bed", bed_type: "raised")
+    bed = Bed.create(name: "West Bed", bed_type: "raised", garden_id: @garden.id)
     patch "/api/beds/#{bed.id}/position",
           { canvas_x: 30.0, canvas_y: 40.0,
             canvas_width: 150.0, canvas_height: 80.0 }.to_json,
@@ -79,7 +79,7 @@ class TestGarden < GardenTest
   end
 
   def test_patch_position_with_polygon_points
-    bed = Bed.create(name: "Odd Bed", bed_type: "raised")
+    bed = Bed.create(name: "Odd Bed", bed_type: "raised", garden_id: @garden.id)
     pts = [[0, 0], [100, 0], [80, 60], [20, 60]]
     patch "/api/beds/#{bed.id}/position",
           { canvas_x: 0.0, canvas_y: 0.0, canvas_points: pts }.to_json,
@@ -99,7 +99,7 @@ class TestGarden < GardenTest
   # ── PATCH /api/beds/:id ──────────────────────────────────────────────────────
 
   def test_patch_bed_updates_name
-    bed = Bed.create(name: "Old Name", bed_type: "raised")
+    bed = Bed.create(name: "Old Name", bed_type: "raised", garden_id: @garden.id)
     patch "/api/beds/#{bed.id}",
           { name: "New Name" }.to_json,
           "CONTENT_TYPE" => "application/json"

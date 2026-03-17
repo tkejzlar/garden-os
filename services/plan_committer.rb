@@ -7,10 +7,13 @@ require_relative "task_generator"
 require_relative "garden_logger"
 
 class PlanCommitter
-  def self.commit!(draft)
+  def self.commit!(draft, garden_id: nil)
     assignments = draft["assignments"] || []
     successions = draft["successions"] || []
     tasks       = draft["tasks"] || []
+
+    # Fall back to Garden.first if no garden_id provided
+    garden_id ||= Garden.first&.id
 
     # Validate bed references
     errors = validate_beds(assignments, tasks)
@@ -39,6 +42,7 @@ class PlanCommitter
           end
 
           Plant.create(
+            garden_id: garden_id,
             variety_name: a["variety_name"],
             crop_type: a["crop_type"] || "other",
             source: a["source"],
@@ -52,6 +56,7 @@ class PlanCommitter
       # Create succession plans + generate tasks
       successions.each do |s|
         plan = SuccessionPlan.create(
+          garden_id: garden_id,
           crop: s["crop"],
           varieties: (s["varieties"] || []).to_json,
           interval_days: s["interval_days"].to_i,
@@ -69,6 +74,7 @@ class PlanCommitter
       # Create explicit tasks
       tasks.each do |t|
         task = Task.create(
+          garden_id: garden_id,
           title: t["title"],
           task_type: t["task_type"] || "sow",
           due_date: t["due_date"] ? Date.parse(t["due_date"]) : nil,
