@@ -186,7 +186,16 @@ The endpoint aggregates:
 - Succession plan targets (via SuccessionPlan.target_beds)
 - Task bed associations (via tasks_beds join)
 
-Plant lifecycle dates derived from: sow date, expected transplant date (stage history), and estimated harvest date (from crop type metadata or manual entry).
+### Occupancy Rules
+
+A plant **occupies** a slot from its earliest dated stage (sow_date or first stage_history entry) until its lifecycle_stage becomes `"done"` or `"removed"`. Plants without a `"done"` stage are assumed to occupy the slot through the end of the season window.
+
+There is no harvest date or days-to-maturity field in the current model. Rather than adding one, the heat-map uses this simple rule:
+- **Slot is occupied** if the plant in it has `lifecycle_stage != "done"`
+- **Slot becomes free** when the plant is advanced to `"done"`
+- **Planned occupancy** (from succession plans) uses `season_start` + `interval_days` × sowing_number to project future slot usage, shown with dashed styling
+
+For the `occupancy[].filled` monthly count: iterate each bed's slots, count how many have a plant that was active during that month (between first stage date and done date, or season end if not done).
 
 ---
 
@@ -313,7 +322,22 @@ Modify `POST /succession/planner/ask` to accept optional context:
 }
 ```
 
-The planner service prepends context to the system prompt so the AI can give specific, actionable answers.
+**How context is injected:** The context is prepended to the **user message text** before passing to `PlannerService.send_message(text)`. This avoids modifying the memoized system prompt or breaking chat history continuity. The context becomes a natural part of the conversation:
+
+```ruby
+# In the route handler:
+context_prefix = if params[:context]
+  ctx = params[:context]
+  "[Context: viewing #{ctx['view']} tab" +
+    (ctx['bed_name'] ? ", bed #{ctx['bed_name']}, #{ctx['empty_slots']} empty slots" : "") +
+  "] "
+else
+  ""
+end
+PlannerService.send_message(context_prefix + params[:message])
+```
+
+This way the AI sees the context inline with the user's question, and the existing chat history mechanism works unchanged.
 
 ---
 
@@ -336,6 +360,8 @@ The planner service prepends context to the system prompt so the AI can give spe
 | `services/planner_service.rb` | Accept and use context parameter in prompts |
 
 No new files. No model changes. No migration needed.
+
+**Note on Arch/IndoorStation cards:** The Arch and IndoorStation models are minimal. The Beds tab renders what data exists (name, between_beds for arches, station_type for indoor). If fields like spring_crop/summer_crop don't exist on the Arch model, those card elements are omitted — the cards degrade gracefully to showing just the name and relationship.
 
 ---
 
