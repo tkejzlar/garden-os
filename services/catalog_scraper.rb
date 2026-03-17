@@ -7,6 +7,7 @@ class CatalogScraper
 
   def self.scrape_all!
     SCRAPERS.each { |s| scrape_supplier!(s) }
+    prune!
   end
 
   def self.scrape_supplier!(name)
@@ -39,6 +40,27 @@ class CatalogScraper
       )
     end
     puts "  #{entries.length} varieties saved."
+  end
+
+  # Remove duplicates and junk entries
+  def self.prune!
+    before = SeedCatalogEntry.count
+
+    # 1. Remove exact duplicates (same normalized name + supplier) — keep lowest ID
+    DB["SELECT MIN(id) as keep_id, variety_name_normalized, supplier FROM seed_catalog_entries GROUP BY variety_name_normalized, supplier HAVING COUNT(*) > 1"].each do |g|
+      SeedCatalogEntry.where(variety_name_normalized: g[:variety_name_normalized], supplier: g[:supplier])
+        .exclude(id: g[:keep_id]).delete
+    end
+
+    # 2. Remove junk entries — Czech tags, navigation text, non-variety names
+    junk = %w[mix\ barev lze\ susit novinka voni mix\ barevnovinka mixture trio\ of]
+    junk.each { |j| SeedCatalogEntry.where(variety_name_normalized: j).delete }
+
+    # 3. Remove very short names (likely scraping artifacts)
+    SeedCatalogEntry.where { Sequel.char_length(:variety_name) < 3 }.delete
+
+    after = SeedCatalogEntry.count
+    puts "Pruned: #{before} → #{after} (removed #{before - after})"
   end
 
   # Shared HTTP fetch helper — uses curl for reliability (same pattern as WeatherService)
