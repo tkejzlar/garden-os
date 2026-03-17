@@ -1,44 +1,63 @@
 module CatalogScrapers
   class MagicGarden
-    BASE     = "https://www.magicgardenseeds.com"
-    CATEGORY = "Vegetable-Seeds"
+    BASE = "https://www.magicgardenseeds.com"
 
-    # Keyword patterns in product names → crop_type
+    # All seed sections — themed + standard
+    SECTIONS = %w[Vegetable-Seeds Herb-Seeds Flower-Seeds Beautiful Magical Aromatic Exotic Beneficial].freeze
+
+    # Fine-grained crop type keywords
     CROP_KEYWORDS = [
       [/\btomato\b|\btomatoes\b|\bsolanum lycopersicum\b/i, "tomato"],
-      [/\bpepper\b|\bchilli\b|\bchili\b|\bcapsicum\b/i, "pepper"],
+      [/\bpepper\b|\bchilli\b|\bchili\b|\bcapsicum\b|\bhabanero\b|\bjalapeno\b/i, "pepper"],
       [/\bcucumber\b|\bgherkin\b|\bcucumis\b/i, "cucumber"],
-      [/\blettuce\b|\bsalad\b|\blactuca\b/i, "lettuce"],
-      [/\bradish\b|\brephanus\b/i, "radish"],
-      [/\bbean\b|\bphaseolus\b|\bvicia faba\b/i, "bean"],
+      [/\blettuce\b|\blactuca\b/i, "lettuce"],
+      [/\bradish\b|\braphanus\b/i, "radish"],
+      [/\bbean\b|\bphaseolus\b|\bvicia faba\b|\bborlotto\b/i, "bean"],
       [/\bpea\b|\bpisum\b/i, "pea"],
       [/\bsquash\b|\bpumpkin\b|\bzucchini\b|\bcourgette\b|\bcucurbita\b/i, "squash"],
       [/\bbrassica\b|\bbrocco\b|\bcabbage\b|\bkale\b|\bkohlrabi\b|\bcauliflower\b/i, "brassica"],
-      [/\bonion\b|\bleek\b|\ballium\b|\bgarlic\b/i, "onion"],
-      [/\bcarrot\b|\bbeetroot\b|\bparsnip\b|\bradicchio\b|\bsalsify\b|\bturnip\b/i, "root"],
-      [/\bbasil\b|\bparsley\b|\bdill\b|\bcoriander\b|\bfennel\b|\bcelery\b|\bherb\b/i, "herb"],
+      [/\bleek\b|\bporee\b/i, "leek"],
+      [/\bonion\b|\ballium\b|\bgarlic\b|\bshallot\b/i, "onion"],
+      [/\bcarrot\b|\bdaucus\b/i, "carrot"],
+      [/\bbeetroot\b|\bbeet\b|\bbeta vulgaris\b/i, "beetroot"],
+      [/\bparsnip\b/i, "parsnip"],
+      [/\bturnip\b|\bswede\b/i, "turnip"],
+      [/\bcelery\b|\bceleriac\b/i, "celery"],
+      [/\baubergine\b|\beggplant\b/i, "aubergine"],
+      [/\bmelon\b/i, "melon"],
+      [/\bchard\b|\bmangold\b/i, "chard"],
+      [/\bspinach\b/i, "spinach"],
+      [/\bcorn\b|\bmaize\b|\bzea mays\b/i, "sweetcorn"],
+      [/\bmorning glory\b|\bipom[oe]ea\b|\bnasturtium\b|\bsunflower\b|\bcosmos\b|\bzinnia\b|\bmarigold\b|\bsweet pea\b|\baster\b/i, "flower"],
+      [/\bbasil\b|\bparsley\b|\bdill\b|\bcoriander\b|\bfennel\b|\bherb\b|\bthyme\b|\bsage\b|\bmint\b|\boregano\b|\blavender\b|\brosemary\b|\bchive\b/i, "herb"],
     ].freeze
 
     def self.scrape
       entries = []
 
-      # Discover total pages by fetching page 1 and looking for pagination
-      first_doc = CatalogScraper.fetch_page("#{BASE}/#{CATEGORY}")
-      return entries unless first_doc
+      SECTIONS.each do |section|
+        first_doc = CatalogScraper.fetch_page("#{BASE}/#{section}")
+        next unless first_doc
 
-      total_pages = discover_total_pages(first_doc)
-      puts "  Magic Garden: #{total_pages} pages to scrape"
+        total_pages = discover_total_pages(first_doc, section)
+        puts "  #{section}: #{total_pages} pages"
 
-      (1..total_pages).each do |page|
-        sleep 1
-        url = page == 1 ? "#{BASE}/#{CATEGORY}" : "#{BASE}/#{CATEGORY}_s#{page}"
-        doc = page == 1 ? first_doc : CatalogScraper.fetch_page(url)
-        next unless doc
+        # Default crop type based on section
+        section_default = case section
+                          when "Herb-Seeds" then "herb"
+                          when "Flower-Seeds" then "flower"
+                          else nil
+                          end
 
-        count_before = entries.length
+        (1..total_pages).each do |page|
+          sleep 1
+          url = page == 1 ? "#{BASE}/#{section}" : "#{BASE}/#{section}_s#{page}"
+          doc = page == 1 ? first_doc : CatalogScraper.fetch_page(url)
+          next unless doc
 
-        # Product titles are in <div class="productbox-title" itemprop="name">
-        doc.css("div.productbox-title[itemprop='name'], div[itemprop='name']").each do |title_div|
+          count_before = entries.length
+
+          doc.css("div.productbox-title[itemprop='name'], div[itemprop='name']").each do |title_div|
           link = title_div.css("a").first
           next unless link
 
@@ -50,8 +69,8 @@ module CatalogScrapers
           # Normalize URL
           full_url = href.start_with?("http") ? href : "#{BASE}#{href}"
 
-          # Determine crop type from product name
-          crop_type = classify_crop(name)
+          # Determine crop type from product name, fall back to section default
+          crop_type = classify_crop(name) || section_default || "other"
 
           # Extract clean variety name (strip botanical names in parentheses and "seeds" suffix)
           variety_name = clean_variety_name(name)
@@ -74,13 +93,14 @@ module CatalogScrapers
           }
         end
 
-        puts "  Page #{page}: #{entries.length - count_before} varieties (#{entries.length} total)"
+        puts "  #{section} p#{page}: #{entries.length - count_before} varieties (#{entries.length} total)"
+        end
       end
 
       entries.uniq { |e| e[:url] }
     end
 
-    def self.discover_total_pages(doc)
+    def self.discover_total_pages(doc, section = "Vegetable-Seeds")
       # Try to find total item count like "Items 1 - 20 of 608"
       text = doc.text
       if text =~ /Items\s+\d+\s*-\s*(\d+)\s+of\s+(\d+)/i
@@ -91,7 +111,7 @@ module CatalogScrapers
 
       # Fallback: look for pagination links like /Vegetable-Seeds_s9
       max_page = 1
-      doc.css("a[href*='#{CATEGORY}_s']").each do |link|
+      doc.css("a[href*='#{section}_s']").each do |link|
         href = link["href"]
         if href =~ /_s(\d+)/
           n = $1.to_i
@@ -105,7 +125,7 @@ module CatalogScrapers
       CROP_KEYWORDS.each do |pattern, crop_type|
         return crop_type if name =~ pattern
       end
-      "other"
+      nil  # no match — caller uses section default
     end
 
     # Remove botanical name in parentheses, trailing "seeds", "organic seeds" etc.
