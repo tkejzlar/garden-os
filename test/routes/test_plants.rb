@@ -89,6 +89,27 @@ class TestPlants < GardenTest
     assert_equal 404, last_response.status
   end
 
+  def test_move_plant_to_new_slot
+    bed = Bed.create(garden_id: @garden.id, name: "TestBed")
+    row = Row.create(bed_id: bed.id, position: 1, name: "R1")
+    slot1 = Slot.create(row_id: row.id, position: 1, name: "S1")
+    slot2 = Slot.create(row_id: row.id, position: 2, name: "S2")
+
+    plant = Plant.create(
+      garden_id: @garden.id,
+      slot_id: slot1.id,
+      variety_name: "Raf",
+      crop_type: "tomato",
+      lifecycle_stage: "seedling"
+    )
+
+    patch "/plants/#{plant.id}", { slot_id: slot2.id }.to_json, { "CONTENT_TYPE" => "application/json" }
+    assert_equal 200, last_response.status
+
+    plant.refresh
+    assert_equal slot2.id, plant.slot_id
+  end
+
   def test_plant_show_includes_harvest_section
     plant = Plant.create(variety_name: "San Marzano", crop_type: "tomato", garden_id: @garden.id)
     Harvest.create(plant_id: plant.id, date: Date.today, quantity: "huge", notes: "Bumper crop")
