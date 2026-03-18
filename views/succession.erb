@@ -294,7 +294,7 @@
     <div style="font-size: 10px; font-weight: 600; color: var(--green-900); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Outdoor Beds</div>
     <!-- Compact bed grid — click to open detail modal -->
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 12px;">
-      <% beds.sort_by { |b| b.respond_to?(:position) ? (b.position || 999) : beds.index(b) }.each do |bed| %>
+      <% beds.sort_by { |b| [b.position || 999, b.id] }.each do |bed| %>
         <%
           active_plants = bed.plants.reject { |p| p.lifecycle_stage == "done" }
           canvas_color = (bed.respond_to?(:canvas_color) && bed.canvas_color) || '#e8e4df'
@@ -369,13 +369,18 @@
 
         <!-- Actions -->
         <div style="display: flex; gap: 8px; margin-top: 12px;">
-          <button @click="$refs.bedModal.close(); activeBed = null; openAIForBed(activeBed?.name, (activeBed?.grid_cols||10) * (activeBed?.grid_rows||10))"
+          <button @click="let n = activeBed?.name, g = (activeBed?.grid_cols||10) * (activeBed?.grid_rows||10); $refs.bedModal.close(); activeBed = null; openAIForBed(n, g)"
                   style="flex: 1; padding: 10px; background: var(--green-900); color: white; border: none; border-radius: 10px; font-size: 13px; cursor: pointer;">
             Ask AI to plan this bed
           </button>
           <a :href="'/beds/' + activeBed.id" style="padding: 10px 16px; background: #f3f4f6; color: var(--text-secondary); border-radius: 10px; font-size: 13px; text-decoration: none; display: flex; align-items: center;">
             Details
           </a>
+        </div>
+        <!-- Reorder -->
+        <div style="display: flex; gap: 8px; margin-top: 8px; justify-content: center;">
+          <button @click="moveBed(activeBed.id, -1)" style="padding: 6px 14px; background: #f3f4f6; border: none; border-radius: 8px; font-size: 12px; cursor: pointer; color: var(--text-secondary);">Move left</button>
+          <button @click="moveBed(activeBed.id, 1)" style="padding: 6px 14px; background: #f3f4f6; border: none; border-radius: 8px; font-size: 12px; cursor: pointer; color: var(--text-secondary);">Move right</button>
         </div>
       </div>
     </template>

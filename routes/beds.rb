@@ -61,6 +61,23 @@ class GardenApp
     json beds
   end
 
+  # ── API: reorder beds ─────────────────────────────────────────────────────────
+  patch "/api/beds/reorder" do
+    content_type :json
+    request.body.rewind
+    body = begin JSON.parse(request.body.read) rescue halt 400, json(error: "Invalid JSON") end
+
+    ids = body["bed_ids"]
+    halt 400, json(error: "bed_ids array required") unless ids.is_a?(Array)
+
+    DB.transaction do
+      ids.each_with_index do |id, i|
+        Bed.where(id: id.to_i, garden_id: @current_garden.id).update(position: i)
+      end
+    end
+    json(ok: true)
+  end
+
   # ── API: create a new bed ────────────────────────────────────────────────────
   # POST /api/beds
   # Body (JSON): { name, bed_type?, canvas_x?, canvas_y?, canvas_width?, canvas_height?,

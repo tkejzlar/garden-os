@@ -61,6 +61,27 @@ function planTab() {
       this.selectedBed = { name, empty_count: emptyCount, plants };
     },
 
+    async moveBed(bedId, direction) {
+      try {
+        const res = await fetch('/api/beds');
+        const beds = await res.json();
+        const sorted = beds.sort((a, b) => (a.position ?? 999) - (b.position ?? 999));
+        const idx = sorted.findIndex(b => b.id === bedId);
+        if (idx < 0) return;
+        const newIdx = idx + direction;
+        if (newIdx < 0 || newIdx >= sorted.length) return;
+        // Swap positions
+        const ids = sorted.map(b => b.id);
+        [ids[idx], ids[newIdx]] = [ids[newIdx], ids[idx]];
+        await fetch('/api/beds/reorder', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bed_ids: ids })
+        });
+        location.reload();
+      } catch(e) { console.error('Reorder failed:', e); }
+    },
+
     async openBedModal(bedId) {
       try {
         const res = await fetch('/api/beds');
