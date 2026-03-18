@@ -346,70 +346,8 @@
 
         <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 8px;">Drag plants to reposition them on the grid.</div>
 
-        <!-- Interactive SVG bed -->
-        <div style="background: #fafafa; border-radius: 10px; padding: 8px; margin-bottom: 12px; touch-action: none; user-select: none;">
-          <svg x-ref="bedSvg"
-               :viewBox="'0 0 ' + svgWidth + ' ' + svgHeight"
-               style="width: 100%; max-height: 400px; min-height: 120px; display: block;"
-               preserveAspectRatio="xMidYMid meet"
-               @mousemove="onDragMove($event)"
-               @mouseup="endDrag($event)"
-               @mouseleave="endDrag($event)"
-               @touchmove.prevent="onDragMove($event)"
-               @touchend="endDrag($event)"
-               @touchcancel="endDrag($event)">
-
-            <!-- Bed outline -->
-            <rect x="0" y="0" :width="svgWidth" :height="svgHeight" rx="6"
-                  :fill="bedColor" fill-opacity="0.12" :stroke="bedColor" stroke-width="1.5"/>
-
-            <!-- Grid lines -->
-            <template x-for="i in (bed?.grid_cols || 10) - 1" :key="'vc'+i">
-              <line :x1="i*cell" y1="0" :x2="i*cell" :y2="svgHeight" stroke="rgba(0,0,0,0.05)" stroke-width="0.3"/>
-            </template>
-            <template x-for="i in (bed?.grid_rows || 10) - 1" :key="'hr'+i">
-              <line x1="0" :y1="i*cell" :x2="svgWidth" :y2="i*cell" stroke="rgba(0,0,0,0.05)" stroke-width="0.3"/>
-            </template>
-
-            <!-- Drop target highlight during drag -->
-            <template x-if="dragging && hoverGrid">
-              <rect :x="hoverGrid.x * cell" :y="hoverGrid.y * cell"
-                    :width="(bed.plants.find(p => p.id === dragging.plantId)?.grid_w || 1) * cell"
-                    :height="(bed.plants.find(p => p.id === dragging.plantId)?.grid_h || 1) * cell"
-                    rx="3" fill="none" stroke="var(--green-900)" stroke-width="1.5" stroke-dasharray="3,2" opacity="0.5"/>
-            </template>
-
-            <!-- Plant regions -->
-            <template x-for="plant in (bed?.plants || [])" :key="plant.id">
-              <g :style="'cursor:' + (dragging?.plantId === plant.id ? 'grabbing' : 'grab')"
-                 :opacity="isDragging(plant) ? 0.7 : 1"
-                 @mousedown="startDrag($event, plant)"
-                 @touchstart.prevent="startDrag($event, plant)"
-                 @click="onPlantClick($event, plant)">
-                <rect :x="plantX(plant) + 0.5" :y="plantY(plant) + 0.5"
-                      :width="plantW(plant) - 1" :height="plantH(plant) - 1"
-                      rx="3" :fill="plantColor(plant.crop_type)" fill-opacity="0.25"
-                      :stroke="plantColor(plant.crop_type)" stroke-width="0.8"/>
-                <!-- Abbreviation -->
-                <text :x="plantX(plant) + plantW(plant)/2"
-                      :y="plantY(plant) + plantH(plant)/2 - (plantW(plant) >= 25 ? 4 : 0)"
-                      text-anchor="middle" dominant-baseline="central"
-                      :font-size="Math.min(plantW(plant)*0.2, plantH(plant)*0.25, 10)"
-                      font-weight="700" :fill="plantColor(plant.crop_type)"
-                      x-text="plantAbbr(plant.crop_type)"></text>
-                <!-- Variety name (if space) -->
-                <template x-if="plantW(plant) >= 25 && plantH(plant) >= 20">
-                  <text :x="plantX(plant) + plantW(plant)/2"
-                        :y="plantY(plant) + plantH(plant)/2 + Math.min(plantW(plant)*0.2, 10)*0.7"
-                        text-anchor="middle" dominant-baseline="central"
-                        :font-size="Math.min(plantW(plant)*0.1, plantH(plant)*0.14, 6)"
-                        fill="#6b7280"
-                        x-text="plant.variety_name.length > 10 ? plant.variety_name.slice(0,9)+'..' : plant.variety_name"></text>
-                </template>
-              </g>
-            </template>
-          </svg>
-        </div>
+        <!-- Interactive SVG bed (rendered imperatively by bed-editor.js) -->
+        <div x-ref="svgWrap" style="background: #fafafa; border-radius: 10px; padding: 8px; margin-bottom: 12px; touch-action: none; user-select: none;"></div>
 
         <!-- Selected plant info popover -->
         <template x-if="selectedPlant">
