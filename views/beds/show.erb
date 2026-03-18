@@ -2,51 +2,13 @@
 
 <h2 style="margin: 8px 0 4px;"><%= @bed.name %></h2>
 <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
-  <%= (@bed.width || 100).round %>×<%= (@bed.length || 100).round %>cm
-  · <%= @bed.grid_cols %>×<%= @bed.grid_rows %> grid
+  <%= (@bed.width || 100).round %>x<%= (@bed.length || 100).round %>cm
+  · <%= @bed.grid_cols %>x<%= @bed.grid_rows %> grid
   · <%= @plants.count %> plants
 </p>
 
-<% bed_w = @bed.grid_cols * 10; bed_h = @bed.grid_rows * 10 %>
-<svg viewBox="0 0 <%= bed_w %> <%= bed_h %>" style="width: 100%; max-height: 400px; min-height: 120px; background: white; border-radius: 8px;" preserveAspectRatio="xMidYMid meet">
-  <rect x="0" y="0" width="<%= bed_w %>" height="<%= bed_h %>" rx="4"
-    fill="<%= @bed.canvas_color || '#e8e4df' %>" fill-opacity="0.3"
-    stroke="<%= @bed.canvas_color || '#e8e4df' %>" stroke-width="2"/>
+<%= erb :"shared/_bed_svg", locals: { bed: @bed, plants: @plants, max_height: "400px", interactive: false } %>
 
-  <% (1...@bed.grid_cols).each do |i| %>
-    <line x1="<%= i*10 %>" y1="0" x2="<%= i*10 %>" y2="<%= bed_h %>" stroke="rgba(0,0,0,0.06)" stroke-width="0.5"/>
-  <% end %>
-  <% (1...@bed.grid_rows).each do |i| %>
-    <line x1="0" y1="<%= i*10 %>" x2="<%= bed_w %>" y2="<%= i*10 %>" stroke="rgba(0,0,0,0.06)" stroke-width="0.5"/>
-  <% end %>
-
-  <% @plants.each do |plant| %>
-    <%
-      px = (plant.grid_x || 0) * 10; py = (plant.grid_y || 0) * 10
-      pw = (plant.grid_w || 1) * 10; ph = (plant.grid_h || 1) * 10
-      fill = case plant.crop_type.to_s.downcase
-        when 'tomato', 'pepper', 'eggplant' then '#fecaca'
-        when 'lettuce', 'spinach', 'chard', 'kale' then '#bbf7d0'
-        when 'herb', 'basil' then '#a7f3d0'
-        when 'flower' then '#fef08a'
-        when 'cucumber', 'squash', 'melon', 'zucchini' then '#bae6fd'
-        else '#e5e7eb'
-      end
-    %>
-    <a href="/plants/<%= plant.id %>">
-      <rect x="<%= px + 1 %>" y="<%= py + 1 %>" width="<%= pw - 2 %>" height="<%= ph - 2 %>"
-        rx="3" fill="<%= fill %>" stroke="#d1d5db" stroke-width="0.5"/>
-      <text x="<%= px + pw/2 %>" y="<%= py + ph/2 - 2 %>" text-anchor="middle"
-        font-size="<%= [pw * 0.15, ph * 0.2, 10].min %>" font-weight="500" fill="#1a2e05">
-        <%= plant.variety_name.length > 12 ? plant.variety_name[0..10] + '..' : plant.variety_name %>
-      </text>
-      <% if plant.quantity && plant.quantity > 1 %>
-        <text x="<%= px + pw/2 %>" y="<%= py + ph/2 + 8 %>" text-anchor="middle"
-          font-size="<%= [pw * 0.12, 8].min %>" fill="#6b7280">x<%= plant.quantity %></text>
-      <% else %>
-        <text x="<%= px + pw/2 %>" y="<%= py + ph/2 + 8 %>" text-anchor="middle"
-          font-size="<%= [pw * 0.12, 8].min %>" fill="#6b7280"><%= plant.lifecycle_stage.tr('_', ' ') %></text>
-      <% end %>
-    </a>
-  <% end %>
-</svg>
+<div style="margin-top: 12px;">
+  <a href="/beds" style="color: var(--green-900); font-size: 13px;">← Back to beds</a>
+</div>
