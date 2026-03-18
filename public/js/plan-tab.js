@@ -7,6 +7,7 @@ function planTab() {
     expandedBeds: [],
     selectedBed: null,
     activeBed: null,
+    bedDragging: null,
     timelineData: null,
     loading: false,
 
@@ -59,6 +60,51 @@ function planTab() {
 
     selectBed(name, emptyCount, plants) {
       this.selectedBed = { name, empty_count: emptyCount, plants };
+    },
+
+    startBedDrag(e, bedId) {
+      if (!e.shiftKey && !e.metaKey) return; // Only shift/cmd+drag
+      e.preventDefault();
+      this.bedDragging = bedId;
+
+      const onMove = (me) => {
+        const grid = this.$refs.bedGrid;
+        if (!grid) return;
+        const cards = [...grid.children];
+        const target = cards.find(c => {
+          const r = c.getBoundingClientRect();
+          return me.clientX >= r.left && me.clientX <= r.right && me.clientY >= r.top && me.clientY <= r.bottom;
+        });
+        if (target && target.dataset.bedId && parseInt(target.dataset.bedId) !== bedId) {
+          // Swap DOM positions visually
+          const dragCard = grid.querySelector(`[data-bed-id="${bedId}"]`);
+          if (dragCard && target) {
+            const dragIdx = [...grid.children].indexOf(dragCard);
+            const targetIdx = [...grid.children].indexOf(target);
+            if (dragIdx < targetIdx) target.after(dragCard);
+            else target.before(dragCard);
+          }
+        }
+      };
+
+      const onUp = async () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        // Save new order
+        const grid = this.$refs.bedGrid;
+        if (grid) {
+          const ids = [...grid.children].map(c => parseInt(c.dataset.bedId)).filter(id => !isNaN(id));
+          await fetch('/api/beds/reorder', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bed_ids: ids })
+          });
+        }
+        this.bedDragging = null;
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
     },
 
     async moveBed(bedId, direction) {

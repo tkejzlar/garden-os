@@ -6,11 +6,26 @@ class Bed < Sequel::Model
   one_to_many :plants
 
   def grid_cols
-    (((width || 100).to_f) / 10.0).ceil.clamp(1, 50)
+    w = (width || 0).to_f
+    # For polygon beds with no width, derive from canvas_points bounding box
+    if w <= 0 && polygon?
+      pts = canvas_points_array
+      xs = pts.map { |p| p[0] }
+      w = (xs.max - xs.min).to_f if xs.any?
+    end
+    w = 100.0 if w <= 0
+    (w / 10.0).ceil.clamp(1, 50)
   end
 
   def grid_rows
-    (((length || 100).to_f) / 10.0).ceil.clamp(1, 50)
+    l = (length || 0).to_f
+    if l <= 0 && polygon?
+      pts = canvas_points_array
+      ys = pts.map { |p| p[1] }
+      l = (ys.max - ys.min).to_f if ys.any?
+    end
+    l = 100.0 if l <= 0
+    (l / 10.0).ceil.clamp(1, 50)
   end
 
   def canvas_points_array

@@ -292,19 +292,22 @@
     <% end %>
 
     <div style="font-size: 10px; font-weight: 600; color: var(--green-900); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Outdoor Beds</div>
-    <!-- Compact bed grid — click to open detail modal -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 12px;">
+    <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 6px;">Hold Shift and drag to reorder beds.</div>
+    <!-- Compact bed grid — click to open detail modal, shift+drag to reorder -->
+    <div x-ref="bedGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 12px;">
       <% beds.sort_by { |b| [b.position || 999, b.id] }.each do |bed| %>
         <%
           active_plants = bed.plants.reject { |p| p.lifecycle_stage == "done" }
           canvas_color = (bed.respond_to?(:canvas_color) && bed.canvas_color) || '#e8e4df'
-          bw = (bed.width || 100).to_f; bl = (bed.length || 100).to_f
-          # For polygon beds with 0 dimensions, use 1:1
-          aspect = (bw > 0 && bl > 0) ? (bw / bl).clamp(0.4, 2.5) : 1.0
+          bw = bed.grid_cols * 10.0
+          bl = bed.grid_rows * 10.0
+          aspect = (bl > 0) ? (bw / bl).clamp(0.4, 2.5) : 1.0
         %>
-        <div @click="openBedModal(<%= bed.id %>)" data-bed-name="<%= bed.name %>" data-bed-id="<%= bed.id %>"
-             style="background: var(--card-bg); border-radius: var(--card-radius); padding: 10px; box-shadow: var(--card-shadow); cursor: pointer; transition: transform 0.1s;"
-             onmousedown="this.style.transform='scale(0.97)'" onmouseup="this.style.transform=''" onmouseleave="this.style.transform=''">
+        <div @click="if (!bedDragging) openBedModal(<%= bed.id %>)"
+             @mousedown="startBedDrag($event, <%= bed.id %>)"
+             data-bed-name="<%= bed.name %>" data-bed-id="<%= bed.id %>"
+             style="background: var(--card-bg); border-radius: var(--card-radius); padding: 10px; box-shadow: var(--card-shadow); cursor: pointer; transition: transform 0.1s, opacity 0.2s;"
+             :style="bedDragging === <%= bed.id %> ? 'opacity: 0.5;' : ''"
           <!-- Mini bed visualization -->
           <div style="background: <%= canvas_color %>15; border: 1.5px solid <%= canvas_color %>88; border-radius: 6px; padding: 6px; margin-bottom: 6px; aspect-ratio: <%= aspect %>; display: flex; flex-wrap: wrap; gap: 2px; align-content: start; overflow: hidden;">
             <% active_plants.each do |plant| %>
@@ -320,8 +323,7 @@
           <!-- Bed label -->
           <div style="font-size: 13px; font-weight: 600; color: var(--green-900);"><%= bed.name %></div>
           <div style="font-size: 10px; color: var(--text-secondary);">
-            <%= active_plants.count %> plants
-            <% if bw > 0 && bl > 0 %> · <%= bw.round %>×<%= bl.round %>cm<% end %>
+            <%= active_plants.count %> plants · <%= bw.round %>×<%= bl.round %>cm
           </div>
         </div>
       <% end %>
@@ -329,7 +331,7 @@
   <% end %>
 
   <!-- Bed detail modal — interactive editor with drag-and-drop -->
-  <dialog x-ref="bedModal" style="position: fixed; inset: 0; margin: auto; padding: 0; border: none; background: white; border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,0.15); max-width: 90vw; max-height: 85vh; width: 560px; overflow: auto;">
+  <dialog x-ref="bedModal" style="position: fixed; inset: 0; margin: auto; padding: 0; border: none; background: white; border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,0.15); max-width: 95vw; max-height: 90vh; width: 700px; overflow: auto;">
     <template x-if="activeBed">
       <div x-data="bedEditor()" x-init="bed = activeBed" style="padding: 16px;">
         <!-- Modal header -->
@@ -366,20 +368,22 @@
           </div>
         </template>
 
-        <!-- Plant list -->
+        <!-- Plant list (2 columns) -->
         <template x-if="bed.plants.length > 0">
           <div>
             <div style="font-size: 10px; font-weight: 600; color: var(--green-900); text-transform: uppercase; margin-bottom: 6px;">Plants</div>
-            <template x-for="plant in bed.plants" :key="'list-'+plant.id">
-              <div @click="selectedPlant = plant" style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #f9fafb; border-radius: 8px; margin-bottom: 4px; cursor: pointer;"
-                   :style="selectedPlant?.id === plant.id ? 'background: #f0fdf4; border: 1px solid #dcfce7;' : ''">
-                <div :style="'width: 14px; height: 14px; border-radius: 3px; background:' + plantColor(plant.crop_type) + '; display: flex; align-items: center; justify-content: center; font-size: 8px; color: white; font-weight: 700;'" x-text="plantAbbr(plant.crop_type)"></div>
-                <div style="flex: 1;">
-                  <div style="font-size: 12px; font-weight: 500; color: var(--text-primary);" x-text="plant.variety_name"></div>
-                  <div style="font-size: 10px; color: var(--text-secondary);" x-text="plant.crop_type + ' · ' + plant.lifecycle_stage.replace(/_/g, ' ')"></div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px;">
+              <template x-for="plant in bed.plants" :key="'list-'+plant.id">
+                <div @click="selectedPlant = plant" style="display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: #f9fafb; border-radius: 8px; cursor: pointer;"
+                     :style="selectedPlant?.id === plant.id ? 'background: #f0fdf4; border: 1px solid #dcfce7;' : ''">
+                  <div :style="'width: 14px; height: 14px; border-radius: 3px; flex-shrink:0; background:' + plantColor(plant.crop_type) + '; display: flex; align-items: center; justify-content: center; font-size: 8px; color: white; font-weight: 700;'" x-text="plantAbbr(plant.crop_type)"></div>
+                  <div style="min-width: 0;">
+                    <div style="font-size: 11px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" x-text="plant.variety_name"></div>
+                    <div style="font-size: 9px; color: var(--text-secondary);" x-text="plant.lifecycle_stage.replace(/_/g, ' ')"></div>
+                  </div>
                 </div>
-              </div>
-            </template>
+              </template>
+            </div>
           </div>
         </template>
 

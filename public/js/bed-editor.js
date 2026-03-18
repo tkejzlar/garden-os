@@ -40,10 +40,24 @@ function bedEditor() {
       svg.style.cssText = 'width:100%;max-height:400px;min-height:120px;display:block;';
       svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
-      // Bed outline
-      const outline = document.createElementNS(NS, 'rect');
-      Object.entries({x:0,y:0,width:w,height:h,rx:6,fill:color,'fill-opacity':0.12,stroke:color,'stroke-width':1.5}).forEach(([k,v]) => outline.setAttribute(k,v));
-      svg.appendChild(outline);
+      // Bed outline — polygon or rectangle
+      if (bed.canvas_points && bed.canvas_points.length > 2) {
+        const xs = bed.canvas_points.map(p => p[0]);
+        const ys = bed.canvas_points.map(p => p[1]);
+        const minX = Math.min(...xs), minY = Math.min(...ys);
+        const maxX = Math.max(...xs), maxY = Math.max(...ys);
+        const polyW = maxX - minX, polyH = maxY - minY;
+        // Scale polygon points to fit the grid viewBox
+        const scaleX = w / polyW, scaleY = h / polyH;
+        const pts = bed.canvas_points.map(p => `${(p[0]-minX)*scaleX},${(p[1]-minY)*scaleY}`).join(' ');
+        const outline = document.createElementNS(NS, 'polygon');
+        Object.entries({points:pts,fill:color,'fill-opacity':0.12,stroke:color,'stroke-width':1.5}).forEach(([k,v]) => outline.setAttribute(k,v));
+        svg.appendChild(outline);
+      } else {
+        const outline = document.createElementNS(NS, 'rect');
+        Object.entries({x:0,y:0,width:w,height:h,rx:6,fill:color,'fill-opacity':0.12,stroke:color,'stroke-width':1.5}).forEach(([k,v]) => outline.setAttribute(k,v));
+        svg.appendChild(outline);
+      }
 
       // Grid lines
       for (let i = 1; i < cols; i++) {
