@@ -262,89 +262,121 @@
     </div>
   <% end %>
 
+  <%
+    # Color legend data
+    crop_colors = {
+      'tomato' => ['#ef4444', 'T'], 'pepper' => ['#ef4444', 'P'], 'eggplant' => ['#ef4444', 'E'],
+      'lettuce' => ['#22c55e', 'Le'], 'spinach' => ['#22c55e', 'Sp'], 'chard' => ['#22c55e', 'Ch'], 'kale' => ['#22c55e', 'K'],
+      'herb' => ['#10b981', 'H'], 'basil' => ['#10b981', 'Ba'],
+      'flower' => ['#eab308', 'F'],
+      'cucumber' => ['#3b82f6', 'Cu'], 'squash' => ['#3b82f6', 'Sq'], 'melon' => ['#3b82f6', 'Me'], 'zucchini' => ['#3b82f6', 'Zu'],
+      'radish' => ['#f97316', 'R'], 'carrot' => ['#f97316', 'Ca'], 'onion' => ['#f97316', 'On'],
+      'bean' => ['#8b5cf6', 'Be'], 'pea' => ['#8b5cf6', 'Pe'],
+    }
+    # Collect all crop types used across beds
+    used_crops = beds.flat_map { |b| b.plants.reject { |p| p.lifecycle_stage == "done" }.map(&:crop_type) }.uniq.compact
+  %>
+
   <% if beds.any? %>
+    <!-- Color legend -->
+    <% if used_crops.any? %>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
+        <% used_crops.sort.each do |ct| %>
+          <% color, abbr = crop_colors[ct.downcase] || ['#9ca3af', ct[0..1].capitalize] %>
+          <div style="display: flex; align-items: center; gap: 3px; font-size: 10px; color: var(--text-secondary);">
+            <div style="width: 12px; height: 12px; background: <%= color %>; border-radius: 3px; opacity: 0.7; display: flex; align-items: center; justify-content: center; font-size: 7px; color: white; font-weight: 700;"><%= abbr %></div>
+            <%= ct %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
     <div style="font-size: 10px; font-weight: 600; color: var(--green-900); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Outdoor Beds</div>
     <!-- Compact bed grid — click to open detail modal -->
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 12px;">
-      <% beds.each do |bed| %>
+      <% beds.sort_by { |b| b.respond_to?(:position) ? (b.position || 999) : beds.index(b) }.each do |bed| %>
         <%
           active_plants = bed.plants.reject { |p| p.lifecycle_stage == "done" }
           canvas_color = (bed.respond_to?(:canvas_color) && bed.canvas_color) || '#e8e4df'
-          # Mini bed shape: proportional to dimensions
           bw = (bed.width || 100).to_f; bl = (bed.length || 100).to_f
-          aspect = bl > 0 ? (bw / bl).clamp(0.4, 2.5) : 1.0
+          # For polygon beds with 0 dimensions, use 1:1
+          aspect = (bw > 0 && bl > 0) ? (bw / bl).clamp(0.4, 2.5) : 1.0
         %>
         <div @click="openBedModal(<%= bed.id %>)" data-bed-name="<%= bed.name %>" data-bed-id="<%= bed.id %>"
              style="background: var(--card-bg); border-radius: var(--card-radius); padding: 10px; box-shadow: var(--card-shadow); cursor: pointer; transition: transform 0.1s;"
              onmousedown="this.style.transform='scale(0.97)'" onmouseup="this.style.transform=''" onmouseleave="this.style.transform=''">
           <!-- Mini bed visualization -->
-          <div style="background: <%= canvas_color %>22; border: 1.5px solid <%= canvas_color %>; border-radius: 6px; padding: 6px; margin-bottom: 6px; aspect-ratio: <%= aspect %>; display: flex; flex-wrap: wrap; gap: 2px; align-content: start; overflow: hidden;">
-            <% active_plants.first(12).each do |plant| %>
+          <div style="background: <%= canvas_color %>15; border: 1.5px solid <%= canvas_color %>88; border-radius: 6px; padding: 6px; margin-bottom: 6px; aspect-ratio: <%= aspect %>; display: flex; flex-wrap: wrap; gap: 2px; align-content: start; overflow: hidden;">
+            <% active_plants.each do |plant| %>
               <%
-                pfill = case plant.crop_type.to_s.downcase
-                  when 'tomato', 'pepper', 'eggplant' then '#ef4444'
-                  when 'lettuce', 'spinach', 'chard', 'kale' then '#22c55e'
-                  when 'herb', 'basil' then '#10b981'
-                  when 'flower' then '#eab308'
-                  when 'cucumber', 'squash', 'melon', 'zucchini' then '#3b82f6'
-                  else '#9ca3af'
-                end
-                # Size proportional to grid area
-                dot_size = [((plant.grid_w || 1) * (plant.grid_h || 1) * 3), 8].max
+                color, abbr = crop_colors[plant.crop_type.to_s.downcase] || ['#9ca3af', plant.crop_type.to_s[0..1].capitalize]
+                # Size proportional to grid area, min 14px to fit letter
+                area = (plant.grid_w || 1) * (plant.grid_h || 1)
+                dot_size = [(area * 3).clamp(14, 32), 14].max
               %>
-              <div style="width: <%= dot_size %>px; height: <%= dot_size %>px; background: <%= pfill %>; border-radius: 3px; opacity: 0.7;" title="<%= plant.variety_name %>"></div>
-            <% end %>
-            <% if active_plants.count > 12 %>
-              <div style="font-size: 8px; color: var(--text-secondary); padding: 2px;">+<%= active_plants.count - 12 %></div>
+              <div style="width: <%= dot_size %>px; height: <%= dot_size %>px; background: <%= color %>; border-radius: 3px; opacity: 0.75; display: flex; align-items: center; justify-content: center; font-size: <%= [dot_size * 0.5, 10].min %>px; color: white; font-weight: 700; line-height: 1;" title="<%= plant.variety_name %> (<%= plant.crop_type %>)"><%= abbr %></div>
             <% end %>
           </div>
           <!-- Bed label -->
           <div style="font-size: 13px; font-weight: 600; color: var(--green-900);"><%= bed.name %></div>
-          <div style="font-size: 10px; color: var(--text-secondary);"><%= active_plants.count %> plants · <%= (bed.width || 100).round %>×<%= (bed.length || 100).round %>cm</div>
+          <div style="font-size: 10px; color: var(--text-secondary);">
+            <%= active_plants.count %> plants
+            <% if bw > 0 && bl > 0 %> · <%= bw.round %>×<%= bl.round %>cm<% end %>
+          </div>
         </div>
       <% end %>
     </div>
   <% end %>
 
-  <!-- Bed detail modal -->
-  <dialog x-ref="bedModal" style="position: fixed; inset: 0; margin: auto; padding: 0; border: none; background: white; border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,0.15); max-width: 90vw; max-height: 85vh; width: 500px; overflow: auto;">
+  <!-- Bed detail modal — full bed editor -->
+  <dialog x-ref="bedModal" style="position: fixed; inset: 0; margin: auto; padding: 0; border: none; background: white; border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,0.15); max-width: 90vw; max-height: 85vh; width: 560px; overflow: auto;">
     <template x-if="activeBed">
       <div style="padding: 16px;">
         <!-- Modal header -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <div>
             <div style="font-size: 18px; font-weight: 700; color: var(--green-900);" x-text="activeBed.name"></div>
-            <div style="font-size: 11px; color: var(--text-secondary);" x-text="activeBed.width + '×' + activeBed.length + 'cm · ' + activeBed.plants.length + ' plants'"></div>
+            <div style="font-size: 11px; color: var(--text-secondary);" x-text="(activeBed.width_cm || 0) + '×' + (activeBed.length_cm || 0) + 'cm · ' + activeBed.grid_cols + '×' + activeBed.grid_rows + ' grid · ' + activeBed.plants.length + ' plants'"></div>
           </div>
           <button @click="$refs.bedModal.close(); activeBed = null;" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary); padding: 4px 8px;">×</button>
         </div>
 
-        <!-- Full SVG bed (rendered via fetch) -->
-        <div x-ref="bedSvgContainer" style="margin-bottom: 12px;"></div>
+        <!-- Full SVG bed -->
+        <div x-ref="bedSvgContainer" style="margin-bottom: 12px; background: #fafafa; border-radius: 10px; padding: 8px;"></div>
 
         <!-- Plant list -->
-        <div style="font-size: 10px; font-weight: 600; color: var(--green-900); text-transform: uppercase; margin-bottom: 6px;">Plants</div>
-        <template x-for="plant in activeBed.plants" :key="plant.id">
-          <a :href="'/plants/' + plant.id" style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #f9fafb; border-radius: 8px; margin-bottom: 4px; text-decoration: none;">
-            <div :style="'width: 10px; height: 10px; border-radius: 3px; background:' + plantColor(plant.crop_type)"></div>
-            <div style="flex: 1;">
-              <div style="font-size: 12px; font-weight: 500; color: var(--text-primary);" x-text="plant.variety_name"></div>
-              <div style="font-size: 10px; color: var(--text-secondary);" x-text="plant.crop_type + ' · ' + plant.lifecycle_stage.replace(/_/g, ' ') + (plant.quantity > 1 ? ' · ×' + plant.quantity : '')"></div>
-            </div>
-            <div style="font-size: 9px; color: var(--text-secondary);" x-text="plant.grid_w + '×' + plant.grid_h + ' at (' + plant.grid_x + ',' + plant.grid_y + ')'"></div>
-          </a>
+        <template x-if="activeBed.plants.length > 0">
+          <div>
+            <div style="font-size: 10px; font-weight: 600; color: var(--green-900); text-transform: uppercase; margin-bottom: 6px;">Plants</div>
+            <template x-for="plant in activeBed.plants" :key="plant.id">
+              <a :href="'/plants/' + plant.id" style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #f9fafb; border-radius: 8px; margin-bottom: 4px; text-decoration: none;">
+                <div :style="'width: 14px; height: 14px; border-radius: 3px; background:' + plantColor(plant.crop_type) + '; display: flex; align-items: center; justify-content: center; font-size: 8px; color: white; font-weight: 700;'" x-text="plantAbbr(plant.crop_type)"></div>
+                <div style="flex: 1;">
+                  <div style="font-size: 12px; font-weight: 500; color: var(--text-primary);" x-text="plant.variety_name"></div>
+                  <div style="font-size: 10px; color: var(--text-secondary);" x-text="plant.crop_type + ' · ' + plant.lifecycle_stage.replace(/_/g, ' ') + (plant.quantity > 1 ? ' · ×' + plant.quantity : '')"></div>
+                </div>
+                <div style="font-size: 9px; color: var(--text-secondary); white-space: nowrap;" x-text="(plant.grid_w||1)*10 + '×' + (plant.grid_h||1)*10 + 'cm'"></div>
+              </a>
+            </template>
+          </div>
         </template>
 
         <template x-if="activeBed.plants.length === 0">
           <div style="text-align: center; padding: 20px; color: var(--text-secondary); font-size: 13px;">
-            No plants yet — tap below to ask the AI for suggestions.
+            No plants placed in this bed yet.
           </div>
         </template>
 
-        <!-- AI suggest button -->
-        <button @click="$refs.bedModal.close(); openAIForBed(activeBed.name, activeBed.grid_cols * activeBed.grid_rows)" style="width: 100%; margin-top: 12px; padding: 10px; background: var(--green-900); color: white; border: none; border-radius: 10px; font-size: 13px; cursor: pointer;">
-          Ask AI to plan this bed
-        </button>
+        <!-- Actions -->
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+          <button @click="$refs.bedModal.close(); activeBed = null; openAIForBed(activeBed?.name, (activeBed?.grid_cols||10) * (activeBed?.grid_rows||10))"
+                  style="flex: 1; padding: 10px; background: var(--green-900); color: white; border: none; border-radius: 10px; font-size: 13px; cursor: pointer;">
+            Ask AI to plan this bed
+          </button>
+          <a :href="'/beds/' + activeBed.id" style="padding: 10px 16px; background: #f3f4f6; color: var(--text-secondary); border-radius: 10px; font-size: 13px; text-decoration: none; display: flex; align-items: center;">
+            Details
+          </a>
+        </div>
       </div>
     </template>
   </dialog>

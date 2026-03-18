@@ -83,26 +83,51 @@ function planTab() {
 
     renderBedSvg(bed) {
       const cell = 10;
-      const w = bed.grid_cols * cell;
-      const h = bed.grid_rows * cell;
+      const cols = bed.grid_cols || 10;
+      const rows = bed.grid_rows || 10;
+      const w = cols * cell;
+      const h = rows * cell;
       const color = bed.canvas_color || '#e8e4df';
+
       let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" style="width:100%;max-height:400px;min-height:100px;" preserveAspectRatio="xMidYMid meet">`;
-      svg += `<rect x="0" y="0" width="${w}" height="${h}" rx="6" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="1.5"/>`;
-      for (let i = 1; i < bed.grid_cols; i++) svg += `<line x1="${i*cell}" y1="0" x2="${i*cell}" y2="${h}" stroke="rgba(0,0,0,0.04)" stroke-width="0.3"/>`;
-      for (let i = 1; i < bed.grid_rows; i++) svg += `<line x1="0" y1="${i*cell}" x2="${w}" y2="${i*cell}" stroke="rgba(0,0,0,0.04)" stroke-width="0.3"/>`;
+
+      // Bed outline — polygon or rectangle
+      if (bed.canvas_points && bed.canvas_points.length > 2) {
+        const xs = bed.canvas_points.map(p => p[0]);
+        const ys = bed.canvas_points.map(p => p[1]);
+        const minX = Math.min(...xs), minY = Math.min(...ys);
+        const pts = bed.canvas_points.map(p => `${p[0]-minX},${p[1]-minY}`).join(' ');
+        svg += `<polygon points="${pts}" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="1.5"/>`;
+      } else {
+        svg += `<rect x="0" y="0" width="${w}" height="${h}" rx="6" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="1.5"/>`;
+      }
+
+      // Grid lines
+      for (let i = 1; i < cols; i++) svg += `<line x1="${i*cell}" y1="0" x2="${i*cell}" y2="${h}" stroke="rgba(0,0,0,0.04)" stroke-width="0.3"/>`;
+      for (let i = 1; i < rows; i++) svg += `<line x1="0" y1="${i*cell}" x2="${w}" y2="${i*cell}" stroke="rgba(0,0,0,0.04)" stroke-width="0.3"/>`;
+
+      // Plant regions
       for (const p of bed.plants) {
         const px = (p.grid_x||0)*cell, py = (p.grid_y||0)*cell;
         const pw = (p.grid_w||1)*cell, ph = (p.grid_h||1)*cell;
         const fill = this.plantColor(p.crop_type);
+        const abbr = this.plantAbbr(p.crop_type);
+
         svg += `<a href="/plants/${p.id}">`;
-        svg += `<rect x="${px+0.5}" y="${py+0.5}" width="${pw-1}" height="${ph-1}" rx="3" fill="${fill}" fill-opacity="0.3" stroke="${fill}" stroke-width="0.8"/>`;
-        if (pw >= 20 && ph >= 15) {
-          const fs = Math.min(pw*0.12, ph*0.18, 8);
-          const name = p.variety_name.length > Math.floor(pw/fs*1.2) ? p.variety_name.slice(0, Math.floor(pw/fs)) + '..' : p.variety_name;
-          svg += `<text x="${px+pw/2}" y="${py+ph/2}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="600" fill="#1a2e05">${name}</text>`;
+        svg += `<rect x="${px+0.5}" y="${py+0.5}" width="${pw-1}" height="${ph-1}" rx="3" fill="${fill}" fill-opacity="0.25" stroke="${fill}" stroke-width="0.8"/>`;
+
+        // Always show abbreviation, add name if space allows
+        const fs = Math.min(pw * 0.2, ph * 0.25, 10);
+        svg += `<text x="${px+pw/2}" y="${py+ph/2 - (pw >= 25 ? fs*0.6 : 0)}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="700" fill="${fill}">${abbr}</text>`;
+
+        if (pw >= 25 && ph >= 20) {
+          const nameFs = Math.min(pw * 0.1, ph * 0.14, 6);
+          const name = p.variety_name.length > Math.floor(pw/nameFs*0.9) ? p.variety_name.slice(0, Math.floor(pw/nameFs*0.7)) + '..' : p.variety_name;
+          svg += `<text x="${px+pw/2}" y="${py+ph/2 + fs*0.7}" text-anchor="middle" dominant-baseline="central" font-size="${nameFs}" fill="#6b7280">${name}</text>`;
         }
         svg += `</a>`;
       }
+
       svg += `</svg>`;
       return svg;
     },
@@ -114,7 +139,21 @@ function planTab() {
       if (['herb','basil'].includes(c)) return '#10b981';
       if (c === 'flower') return '#eab308';
       if (['cucumber','squash','melon','zucchini'].includes(c)) return '#3b82f6';
+      if (['radish','carrot','onion'].includes(c)) return '#f97316';
+      if (['bean','pea'].includes(c)) return '#8b5cf6';
       return '#9ca3af';
+    },
+
+    plantAbbr(cropType) {
+      const abbrs = {
+        tomato:'T', pepper:'P', eggplant:'E',
+        lettuce:'Le', spinach:'Sp', chard:'Ch', kale:'K',
+        herb:'H', basil:'Ba', flower:'F',
+        cucumber:'Cu', squash:'Sq', melon:'Me', zucchini:'Zu',
+        radish:'R', carrot:'Ca', onion:'On',
+        bean:'Be', pea:'Pe'
+      };
+      return abbrs[(cropType||'').toLowerCase()] || (cropType||'?').slice(0,2);
     },
 
     openAIForBed(bedName, emptyCount) {

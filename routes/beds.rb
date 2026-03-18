@@ -48,7 +48,7 @@ class GardenApp
         canvas_color: bed.canvas_color,
         canvas_x: bed.canvas_x, canvas_y: bed.canvas_y,
         canvas_width: bed.canvas_width, canvas_height: bed.canvas_height,
-        canvas_points: bed.canvas_points,
+        canvas_points: bed.canvas_points_array,
         bed_type: bed.bed_type,
         plants: active_plants.map { |p|
           { id: p.id, variety_name: p.variety_name, crop_type: p.crop_type,
