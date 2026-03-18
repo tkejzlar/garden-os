@@ -328,40 +328,124 @@
     </div>
   <% end %>
 
-  <!-- Bed detail modal — full bed editor -->
+  <!-- Bed detail modal — interactive editor with drag-and-drop -->
   <dialog x-ref="bedModal" style="position: fixed; inset: 0; margin: auto; padding: 0; border: none; background: white; border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,0.15); max-width: 90vw; max-height: 85vh; width: 560px; overflow: auto;">
     <template x-if="activeBed">
-      <div style="padding: 16px;">
+      <div x-data="bedEditor()" x-init="bed = activeBed" style="padding: 16px;">
         <!-- Modal header -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <div>
-            <div style="font-size: 18px; font-weight: 700; color: var(--green-900);" x-text="activeBed.name"></div>
-            <div style="font-size: 11px; color: var(--text-secondary);" x-text="(activeBed.width_cm || 0) + '×' + (activeBed.length_cm || 0) + 'cm · ' + activeBed.grid_cols + '×' + activeBed.grid_rows + ' grid · ' + activeBed.plants.length + ' plants'"></div>
+            <div style="font-size: 18px; font-weight: 700; color: var(--green-900);" x-text="bed.name"></div>
+            <div style="font-size: 11px; color: var(--text-secondary);" x-text="(bed.width_cm || 0) + '×' + (bed.length_cm || 0) + 'cm · ' + bed.plants.length + ' plants'"></div>
           </div>
-          <button @click="$refs.bedModal.close(); activeBed = null;" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary); padding: 4px 8px;">×</button>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <template x-if="saving"><span style="font-size: 10px; color: var(--text-secondary);">Saving...</span></template>
+            <button @click="$refs.bedModal.close(); activeBed = null;" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary); padding: 4px 8px;">×</button>
+          </div>
         </div>
 
-        <!-- Full SVG bed -->
-        <div x-ref="bedSvgContainer" style="margin-bottom: 12px; background: #fafafa; border-radius: 10px; padding: 8px;"></div>
+        <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 8px;">Drag plants to reposition them on the grid.</div>
+
+        <!-- Interactive SVG bed -->
+        <div style="background: #fafafa; border-radius: 10px; padding: 8px; margin-bottom: 12px; touch-action: none; user-select: none;">
+          <svg x-ref="bedSvg"
+               :viewBox="'0 0 ' + svgWidth + ' ' + svgHeight"
+               style="width: 100%; max-height: 400px; min-height: 120px; display: block;"
+               preserveAspectRatio="xMidYMid meet"
+               @mousemove="onDragMove($event)"
+               @mouseup="endDrag($event)"
+               @mouseleave="endDrag($event)"
+               @touchmove.prevent="onDragMove($event)"
+               @touchend="endDrag($event)"
+               @touchcancel="endDrag($event)">
+
+            <!-- Bed outline -->
+            <rect x="0" y="0" :width="svgWidth" :height="svgHeight" rx="6"
+                  :fill="bedColor" fill-opacity="0.12" :stroke="bedColor" stroke-width="1.5"/>
+
+            <!-- Grid lines -->
+            <template x-for="i in (bed?.grid_cols || 10) - 1" :key="'vc'+i">
+              <line :x1="i*cell" y1="0" :x2="i*cell" :y2="svgHeight" stroke="rgba(0,0,0,0.05)" stroke-width="0.3"/>
+            </template>
+            <template x-for="i in (bed?.grid_rows || 10) - 1" :key="'hr'+i">
+              <line x1="0" :y1="i*cell" :x2="svgWidth" :y2="i*cell" stroke="rgba(0,0,0,0.05)" stroke-width="0.3"/>
+            </template>
+
+            <!-- Drop target highlight during drag -->
+            <template x-if="dragging && hoverGrid">
+              <rect :x="hoverGrid.x * cell" :y="hoverGrid.y * cell"
+                    :width="(bed.plants.find(p => p.id === dragging.plantId)?.grid_w || 1) * cell"
+                    :height="(bed.plants.find(p => p.id === dragging.plantId)?.grid_h || 1) * cell"
+                    rx="3" fill="none" stroke="var(--green-900)" stroke-width="1.5" stroke-dasharray="3,2" opacity="0.5"/>
+            </template>
+
+            <!-- Plant regions -->
+            <template x-for="plant in (bed?.plants || [])" :key="plant.id">
+              <g :style="'cursor:' + (dragging?.plantId === plant.id ? 'grabbing' : 'grab')"
+                 :opacity="isDragging(plant) ? 0.7 : 1"
+                 @mousedown="startDrag($event, plant)"
+                 @touchstart.prevent="startDrag($event, plant)"
+                 @click="onPlantClick($event, plant)">
+                <rect :x="plantX(plant) + 0.5" :y="plantY(plant) + 0.5"
+                      :width="plantW(plant) - 1" :height="plantH(plant) - 1"
+                      rx="3" :fill="plantColor(plant.crop_type)" fill-opacity="0.25"
+                      :stroke="plantColor(plant.crop_type)" stroke-width="0.8"/>
+                <!-- Abbreviation -->
+                <text :x="plantX(plant) + plantW(plant)/2"
+                      :y="plantY(plant) + plantH(plant)/2 - (plantW(plant) >= 25 ? 4 : 0)"
+                      text-anchor="middle" dominant-baseline="central"
+                      :font-size="Math.min(plantW(plant)*0.2, plantH(plant)*0.25, 10)"
+                      font-weight="700" :fill="plantColor(plant.crop_type)"
+                      x-text="plantAbbr(plant.crop_type)"></text>
+                <!-- Variety name (if space) -->
+                <template x-if="plantW(plant) >= 25 && plantH(plant) >= 20">
+                  <text :x="plantX(plant) + plantW(plant)/2"
+                        :y="plantY(plant) + plantH(plant)/2 + Math.min(plantW(plant)*0.2, 10)*0.7"
+                        text-anchor="middle" dominant-baseline="central"
+                        :font-size="Math.min(plantW(plant)*0.1, plantH(plant)*0.14, 6)"
+                        fill="#6b7280"
+                        x-text="plant.variety_name.length > 10 ? plant.variety_name.slice(0,9)+'..' : plant.variety_name"></text>
+                </template>
+              </g>
+            </template>
+          </svg>
+        </div>
+
+        <!-- Selected plant info popover -->
+        <template x-if="selectedPlant">
+          <div style="background: #f0fdf4; border: 1px solid #dcfce7; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+              <div>
+                <div style="font-size: 13px; font-weight: 600; color: var(--green-900);" x-text="selectedPlant.variety_name"></div>
+                <div style="font-size: 11px; color: var(--text-secondary);" x-text="selectedPlant.crop_type + ' · ' + selectedPlant.lifecycle_stage.replace(/_/g, ' ')"></div>
+                <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;" x-text="(selectedPlant.grid_w||1)*10 + '×' + (selectedPlant.grid_h||1)*10 + 'cm at (' + selectedPlant.grid_x + ',' + selectedPlant.grid_y + ')' + (selectedPlant.quantity > 1 ? ' · ×' + selectedPlant.quantity : '')"></div>
+              </div>
+              <div style="display: flex; gap: 4px;">
+                <a :href="'/plants/' + selectedPlant.id" style="padding: 4px 10px; background: var(--green-900); color: white; border-radius: 6px; font-size: 11px; text-decoration: none;">View</a>
+                <button @click="selectedPlant = null" style="padding: 4px 8px; background: #f3f4f6; border: none; border-radius: 6px; font-size: 11px; cursor: pointer; color: var(--text-secondary);">×</button>
+              </div>
+            </div>
+          </div>
+        </template>
 
         <!-- Plant list -->
-        <template x-if="activeBed.plants.length > 0">
+        <template x-if="bed.plants.length > 0">
           <div>
             <div style="font-size: 10px; font-weight: 600; color: var(--green-900); text-transform: uppercase; margin-bottom: 6px;">Plants</div>
-            <template x-for="plant in activeBed.plants" :key="plant.id">
-              <a :href="'/plants/' + plant.id" style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #f9fafb; border-radius: 8px; margin-bottom: 4px; text-decoration: none;">
+            <template x-for="plant in bed.plants" :key="'list-'+plant.id">
+              <div @click="selectedPlant = plant" style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #f9fafb; border-radius: 8px; margin-bottom: 4px; cursor: pointer;"
+                   :style="selectedPlant?.id === plant.id ? 'background: #f0fdf4; border: 1px solid #dcfce7;' : ''">
                 <div :style="'width: 14px; height: 14px; border-radius: 3px; background:' + plantColor(plant.crop_type) + '; display: flex; align-items: center; justify-content: center; font-size: 8px; color: white; font-weight: 700;'" x-text="plantAbbr(plant.crop_type)"></div>
                 <div style="flex: 1;">
                   <div style="font-size: 12px; font-weight: 500; color: var(--text-primary);" x-text="plant.variety_name"></div>
-                  <div style="font-size: 10px; color: var(--text-secondary);" x-text="plant.crop_type + ' · ' + plant.lifecycle_stage.replace(/_/g, ' ') + (plant.quantity > 1 ? ' · ×' + plant.quantity : '')"></div>
+                  <div style="font-size: 10px; color: var(--text-secondary);" x-text="plant.crop_type + ' · ' + plant.lifecycle_stage.replace(/_/g, ' ')"></div>
                 </div>
-                <div style="font-size: 9px; color: var(--text-secondary); white-space: nowrap;" x-text="(plant.grid_w||1)*10 + '×' + (plant.grid_h||1)*10 + 'cm'"></div>
-              </a>
+              </div>
             </template>
           </div>
         </template>
 
-        <template x-if="activeBed.plants.length === 0">
+        <template x-if="bed.plants.length === 0">
           <div style="text-align: center; padding: 20px; color: var(--text-secondary); font-size: 13px;">
             No plants placed in this bed yet.
           </div>
@@ -369,18 +453,17 @@
 
         <!-- Actions -->
         <div style="display: flex; gap: 8px; margin-top: 12px;">
-          <button @click="let n = activeBed?.name, g = (activeBed?.grid_cols||10) * (activeBed?.grid_rows||10); $refs.bedModal.close(); activeBed = null; openAIForBed(n, g)"
+          <button @click="let n = bed?.name, g = (bed?.grid_cols||10) * (bed?.grid_rows||10); $refs.bedModal.close(); $data.activeBed = null; openAIForBed(n, g)"
                   style="flex: 1; padding: 10px; background: var(--green-900); color: white; border: none; border-radius: 10px; font-size: 13px; cursor: pointer;">
             Ask AI to plan this bed
           </button>
-          <a :href="'/beds/' + activeBed.id" style="padding: 10px 16px; background: #f3f4f6; color: var(--text-secondary); border-radius: 10px; font-size: 13px; text-decoration: none; display: flex; align-items: center;">
+          <a :href="'/beds/' + bed.id" style="padding: 10px 16px; background: #f3f4f6; color: var(--text-secondary); border-radius: 10px; font-size: 13px; text-decoration: none; display: flex; align-items: center;">
             Details
           </a>
         </div>
-        <!-- Reorder -->
         <div style="display: flex; gap: 8px; margin-top: 8px; justify-content: center;">
-          <button @click="moveBed(activeBed.id, -1)" style="padding: 6px 14px; background: #f3f4f6; border: none; border-radius: 8px; font-size: 12px; cursor: pointer; color: var(--text-secondary);">Move left</button>
-          <button @click="moveBed(activeBed.id, 1)" style="padding: 6px 14px; background: #f3f4f6; border: none; border-radius: 8px; font-size: 12px; cursor: pointer; color: var(--text-secondary);">Move right</button>
+          <button @click="moveBed(bed.id, -1)" style="padding: 6px 14px; background: #f3f4f6; border: none; border-radius: 8px; font-size: 12px; cursor: pointer; color: var(--text-secondary);">Move left</button>
+          <button @click="moveBed(bed.id, 1)" style="padding: 6px 14px; background: #f3f4f6; border: none; border-radius: 8px; font-size: 12px; cursor: pointer; color: var(--text-secondary);">Move right</button>
         </div>
       </div>
     </template>
@@ -523,3 +606,4 @@
 </div><!-- /x-data="planTab()" -->
 
 <script src="/js/plan-tab.js"></script>
+<script src="/js/bed-editor.js"></script>
