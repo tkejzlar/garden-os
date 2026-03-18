@@ -55,9 +55,9 @@
 
 <!-- ── Tab Bar ── -->
 <div style="display: flex; background: var(--card-bg); border-bottom: 1px solid #e5e7eb; padding: 0 8px;">
-  <template x-for="t in ['tasks', 'timeline', 'beds']">
-    <button @click="tab = t" :style="tab === t ? 'font-weight: 600; color: var(--green-900); border-bottom: 2px solid var(--green-900);' : 'color: var(--gray-400);'" style="flex: 1; padding: 10px 0; text-align: center; font-size: 12px; background: none; border: none; cursor: pointer; margin-bottom: -1px;" x-text="t.charAt(0).toUpperCase() + t.slice(1)"></button>
-  </template>
+  <button @click="tab = 'tasks'" :style="tab === 'tasks' ? 'font-weight: 600; color: var(--green-900); border-bottom: 2px solid var(--green-900)' : 'color: var(--gray-400); border-bottom: 2px solid transparent'" style="flex: 1; padding: 10px 0; text-align: center; font-size: 13px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer;">Tasks</button>
+  <button @click="tab = 'timeline'" :style="tab === 'timeline' ? 'font-weight: 600; color: var(--green-900); border-bottom: 2px solid var(--green-900)' : 'color: var(--gray-400); border-bottom: 2px solid transparent'" style="flex: 1; padding: 10px 0; text-align: center; font-size: 13px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer;">Timeline</button>
+  <button @click="tab = 'beds'" :style="tab === 'beds' ? 'font-weight: 600; color: var(--green-900); border-bottom: 2px solid var(--green-900)' : 'color: var(--gray-400); border-bottom: 2px solid transparent'" style="flex: 1; padding: 10px 0; text-align: center; font-size: 13px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer;">Beds</button>
 </div>
 
 <!-- ── Tasks Tab Panel ── -->
