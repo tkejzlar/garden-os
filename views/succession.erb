@@ -271,7 +271,8 @@
           active_plants = bed.plants.reject { |p| p.lifecycle_stage == "done" }
           canvas_color = (bed.respond_to?(:canvas_color) && bed.canvas_color) || '#e8e4df'
           # Mini bed shape: proportional to dimensions
-          aspect = ((bed.width || 100).to_f / (bed.length || 100).to_f).clamp(0.4, 2.5)
+          bw = (bed.width || 100).to_f; bl = (bed.length || 100).to_f
+          aspect = bl > 0 ? (bw / bl).clamp(0.4, 2.5) : 1.0
         %>
         <div @click="openBedModal(<%= bed.id %>)" data-bed-name="<%= bed.name %>" data-bed-id="<%= bed.id %>"
              style="background: var(--card-bg); border-radius: var(--card-radius); padding: 10px; box-shadow: var(--card-shadow); cursor: pointer; transition: transform 0.1s;"
