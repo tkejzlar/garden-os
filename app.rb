@@ -39,6 +39,8 @@ class GardenApp < Sinatra::Base
   get "/health" do
     json status: "ok"
   end
+
+
 end
 
 require_relative "routes/dashboard"

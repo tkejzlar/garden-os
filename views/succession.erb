@@ -571,6 +571,10 @@ function planTab() {
       this.aiMessages.push({ role: 'user', content: text, id: Date.now() });
       this.aiSending = true;
 
+      // Create a placeholder message for streaming response
+      const msgId = Date.now() + 1;
+      this.aiMessages.push({ role: 'assistant', content: '', id: msgId, streaming: true });
+
       try {
         const context = this.getAIContext();
         const res = await fetch('/succession/planner/ask', {
@@ -578,29 +582,49 @@ function planTab() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: text, context })
         });
-        const { request_id } = await res.json();
-        await this.pollForAIResponse(request_id);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            try {
+              const event = JSON.parse(line.slice(6));
+              const msg = this.aiMessages.find(m => m.id === msgId);
+              if (!msg) continue;
+
+              if (event.type === 'chunk') {
+                msg.content += event.content;
+              } else if (event.type === 'draft') {
+                msg.draft = event.draft;
+              } else if (event.type === 'bed_layout') {
+                this.pendingLayout = event.bed_layout;
+              } else if (event.type === 'error') {
+                msg.content = event.content;
+              } else if (event.type === 'done') {
+                msg.streaming = false;
+              }
+            } catch(e) { /* skip malformed events */ }
+          }
+        }
+
+        // Mark streaming complete
+        const msg = this.aiMessages.find(m => m.id === msgId);
+        if (msg) msg.streaming = false;
       } catch(e) {
-        this.aiMessages.push({ role: 'assistant', content: 'Sorry, something went wrong.', id: Date.now() });
+        const msg = this.aiMessages.find(m => m.id === msgId);
+        if (msg) { msg.content = 'Sorry, something went wrong.'; msg.streaming = false; }
       }
       this.aiSending = false;
-    },
-
-    async pollForAIResponse(requestId) {
-      for (let i = 0; i < 60; i++) {
-        await new Promise(r => setTimeout(r, 2000));
-        const res = await fetch(`/succession/planner/result/${requestId}`);
-        const data = await res.json();
-        if (data.status === 'done') {
-          this.aiMessages.push({ role: 'assistant', content: data.content, id: Date.now(), draft: data.draft });
-          if (data.bed_layout) this.pendingLayout = data.bed_layout;
-          return;
-        }
-        if (data.status === 'error') {
-          this.aiMessages.push({ role: 'assistant', content: data.error || 'Planning failed.', id: Date.now() });
-          return;
-        }
-      }
     },
 
     sendQuickAction(text) {

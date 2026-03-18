@@ -173,6 +173,7 @@ class PlannerService
     PlannerMessage.create(garden_id: @garden_id, role: "user", content: user_text, created_at: Time.now)
 
     Thread.current[:planner_draft] = nil
+    Thread.current[:planner_bed_layout] = nil
     @tool_calls = []
     full_content = ""
 
@@ -188,11 +189,13 @@ class PlannerService
 
     elapsed = (Time.now - start_time).round(1)
     @last_draft = Thread.current[:planner_draft]
+    @last_bed_layout = Thread.current[:planner_bed_layout]
 
     GardenLogger.info "[Planner/Stream] Complete in #{elapsed}s, length=#{full_content.length}, has_draft=#{!@last_draft.nil?}"
 
-    # Send draft as final event if present
+    # Send draft/bed_layout as final events if present
     block.call({ type: "draft", draft: @last_draft }) if @last_draft && block
+    block.call({ type: "bed_layout", bed_layout: @last_bed_layout }) if @last_bed_layout && block
 
     # Save to DB
     PlannerMessage.create(
@@ -205,7 +208,7 @@ class PlannerService
 
     block.call({ type: "done" }) if block
 
-    { content: full_content, draft: @last_draft, tool_calls: @tool_calls }
+    { content: full_content, draft: @last_draft, bed_layout: @last_bed_layout, tool_calls: @tool_calls }
   rescue => e
     elapsed = start_time ? (Time.now - start_time).round(1) : 0
     GardenLogger.error "[Planner/Stream] Error after #{elapsed}s: #{e.class}: #{e.message}"
@@ -219,6 +222,6 @@ class PlannerService
 
     block.call({ type: "error", content: "Error: #{e.message}" }) if block
     PlannerMessage.create(garden_id: @garden_id, role: "assistant", content: "Sorry, I encountered an error.", created_at: Time.now)
-    { content: "Error: #{e.message}", draft: nil, tool_calls: @tool_calls }
+    { content: "Error: #{e.message}", draft: nil, bed_layout: nil, tool_calls: @tool_calls }
   end
 end

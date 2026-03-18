@@ -353,11 +353,7 @@ class GardenApp
     })
   end
 
-  # ── Async planner: POST kicks off AI in background, GET polls for result ──
-
-  # In-memory store for pending requests (single user, single process)
-  PLANNER_RESULTS = {}
-  PLANNER_MUTEX = Mutex.new
+  # ── AI Planner: SSE streaming endpoint ──────────────────────────────────
 
   post "/succession/planner/ask" do
     request.body.rewind
@@ -383,42 +379,22 @@ class GardenApp
 
     require_relative "../services/planner_service"
     require_relative "../services/garden_logger"
-    require "securerandom"
-
-    request_id = SecureRandom.hex(8)
-    PLANNER_MUTEX.synchronize { PLANNER_RESULTS[request_id] = { status: "pending" } }
 
     garden_id = @current_garden.id
 
-    # AI runs in background thread — result stored when done
-    Thread.new do
-      begin
-        Thread.current[:current_garden_id] = garden_id
-        GardenLogger.info "[Planner/Async] Starting #{request_id}"
-        service = PlannerService.new
-        result = service.send_message(message)
-        GardenLogger.info "[Planner/Async] #{request_id} done, #{result[:content]&.length} chars"
+    content_type "text/event-stream"
+    headers "Cache-Control" => "no-cache", "Connection" => "keep-alive"
 
-        PLANNER_MUTEX.synchronize do
-          PLANNER_RESULTS[request_id] = { status: "done", content: result[:content], draft: result[:draft], bed_layout: result[:bed_layout] }
-        end
-      rescue => e
-        GardenLogger.error "[Planner/Async] #{request_id} error: #{e.message}"
-        PLANNER_MUTEX.synchronize do
-          PLANNER_RESULTS[request_id] = { status: "done", content: "Error: #{e.message}", draft: nil, bed_layout: nil }
-        end
+    stream(:keep_open) do |out|
+      Thread.current[:current_garden_id] = garden_id
+      service = PlannerService.new
+
+      service.send_message_streaming(message) do |event|
+        break if out.closed?
+        out << "data: #{JSON.generate(event)}\n\n"
       end
-      # Cleanup after 5 min
-      Thread.new { sleep 300; PLANNER_MUTEX.synchronize { PLANNER_RESULTS.delete(request_id) } }
+      out.close unless out.closed?
     end
-
-    json({ request_id: request_id })
-  end
-
-  get "/succession/planner/result/:id" do
-    result = PLANNER_MUTEX.synchronize { PLANNER_RESULTS[params[:id]] }
-    halt 404, json(error: "Not found") unless result
-    json result
   end
 
   post "/succession/planner/commit" do
