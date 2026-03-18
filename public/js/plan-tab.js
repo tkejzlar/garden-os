@@ -6,6 +6,7 @@ function planTab() {
     tab: 'tasks',
     expandedBeds: [],
     selectedBed: null,
+    activeBed: null,
     timelineData: null,
     loading: false,
 
@@ -60,6 +61,62 @@ function planTab() {
       this.selectedBed = { name, empty_count: emptyCount, plants };
     },
 
+    async openBedModal(bedId) {
+      try {
+        const res = await fetch('/api/beds');
+        const beds = await res.json();
+        const bed = beds.find(b => b.id === bedId);
+        if (!bed) return;
+        this.activeBed = bed;
+        this.$nextTick(() => {
+          if (this.$refs.bedModal) this.$refs.bedModal.showModal();
+          // Render SVG in container (trusted data from our own DB)
+          if (this.$refs.bedSvgContainer) {
+            this.$refs.bedSvgContainer.textContent = '';
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(this.renderBedSvg(bed), 'image/svg+xml');
+            this.$refs.bedSvgContainer.appendChild(doc.documentElement);
+          }
+        });
+      } catch(e) { console.error('Failed to load bed:', e); }
+    },
+
+    renderBedSvg(bed) {
+      const cell = 10;
+      const w = bed.grid_cols * cell;
+      const h = bed.grid_rows * cell;
+      const color = bed.canvas_color || '#e8e4df';
+      let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" style="width:100%;max-height:400px;min-height:100px;" preserveAspectRatio="xMidYMid meet">`;
+      svg += `<rect x="0" y="0" width="${w}" height="${h}" rx="6" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="1.5"/>`;
+      for (let i = 1; i < bed.grid_cols; i++) svg += `<line x1="${i*cell}" y1="0" x2="${i*cell}" y2="${h}" stroke="rgba(0,0,0,0.04)" stroke-width="0.3"/>`;
+      for (let i = 1; i < bed.grid_rows; i++) svg += `<line x1="0" y1="${i*cell}" x2="${w}" y2="${i*cell}" stroke="rgba(0,0,0,0.04)" stroke-width="0.3"/>`;
+      for (const p of bed.plants) {
+        const px = (p.grid_x||0)*cell, py = (p.grid_y||0)*cell;
+        const pw = (p.grid_w||1)*cell, ph = (p.grid_h||1)*cell;
+        const fill = this.plantColor(p.crop_type);
+        svg += `<a href="/plants/${p.id}">`;
+        svg += `<rect x="${px+0.5}" y="${py+0.5}" width="${pw-1}" height="${ph-1}" rx="3" fill="${fill}" fill-opacity="0.3" stroke="${fill}" stroke-width="0.8"/>`;
+        if (pw >= 20 && ph >= 15) {
+          const fs = Math.min(pw*0.12, ph*0.18, 8);
+          const name = p.variety_name.length > Math.floor(pw/fs*1.2) ? p.variety_name.slice(0, Math.floor(pw/fs)) + '..' : p.variety_name;
+          svg += `<text x="${px+pw/2}" y="${py+ph/2}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="600" fill="#1a2e05">${name}</text>`;
+        }
+        svg += `</a>`;
+      }
+      svg += `</svg>`;
+      return svg;
+    },
+
+    plantColor(cropType) {
+      const c = (cropType || '').toLowerCase();
+      if (['tomato','pepper','eggplant'].includes(c)) return '#ef4444';
+      if (['lettuce','spinach','chard','kale'].includes(c)) return '#22c55e';
+      if (['herb','basil'].includes(c)) return '#10b981';
+      if (c === 'flower') return '#eab308';
+      if (['cucumber','squash','melon','zucchini'].includes(c)) return '#3b82f6';
+      return '#9ca3af';
+    },
+
     openAIForBed(bedName, emptyCount) {
       this.selectedBed = { name: bedName, empty_count: emptyCount, plants: [] };
       if (this.$refs.aiDrawer.showModal) this.$refs.aiDrawer.showModal();
@@ -110,6 +167,11 @@ function planTab() {
 
               if (event.type === 'chunk') {
                 msg.content += event.content;
+                // Auto-scroll drawer messages to bottom
+                this.$nextTick(() => {
+                  const el = this.$refs.aiMessages;
+                  if (el) el.scrollTop = el.scrollHeight;
+                });
               } else if (event.type === 'draft') {
                 msg.draft = event.draft;
               } else if (event.type === 'bed_layout') {

@@ -82,10 +82,12 @@ class GardenApp
     content_type :json
     today = Date.today
 
-    earliest = Task.where(garden_id: @current_garden.id).min(:due_date)
-    latest = Task.where(garden_id: @current_garden.id).max(:due_date)
-    plan_starts = SuccessionPlan.where(garden_id: @current_garden.id).min(:season_start)
-    plan_ends = SuccessionPlan.where(garden_id: @current_garden.id).max(:season_end)
+    # Parse dates safely — SQLite may return strings
+    to_date = ->(v) { v.is_a?(Date) ? v : v.is_a?(String) ? Date.parse(v) : nil rescue nil }
+    earliest = to_date.call(Task.where(garden_id: @current_garden.id).min(:due_date))
+    latest = to_date.call(Task.where(garden_id: @current_garden.id).max(:due_date))
+    plan_starts = to_date.call(SuccessionPlan.where(garden_id: @current_garden.id).min(:season_start))
+    plan_ends = to_date.call(SuccessionPlan.where(garden_id: @current_garden.id).max(:season_end))
 
     season_start = [earliest, plan_starts, today].compact.min - 14
     season_end = [latest, plan_ends, today + 180].compact.max + 14
