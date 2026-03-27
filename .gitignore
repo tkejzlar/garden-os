@@ -8,3 +8,5 @@ public/uploads/**/*
 log/
 .superpowers/
 .worktrees/
+node_modules/
+public/dist/

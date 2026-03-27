@@ -1,0 +1,31 @@
+---
+category: planner-stream-error
+summary: 'Puma::ConnectionError: Socket timeout writing data'
+detail: 'User said: ''d like to grow a lot of tomatoes, some peppers, cucumbers, two
+  eggplants and then the companion stuff - salads, radishes, peas, beans, leeks etc,'
+context:
+  model: gpt-5.4
+  elapsed_seconds: 7.5
+  backtrace:
+  - "/Users/tkejzlar/.rvm/gems/ruby-3.4.9/gems/puma-6.6.1/lib/puma/request.rb:305:in
+    'Puma::Request#fast_write_str'"
+  - "/Users/tkejzlar/.rvm/gems/ruby-3.4.9/gems/puma-6.6.1/lib/puma/request.rb:381:in
+    'block in Puma::Request#fast_write_response'"
+  - "/Users/tkejzlar/Library/CloudStorage/Dropbox/scripts/garden-os/routes/succession.rb:213:in
+    'Enumerator::Yielder#<<'"
+  - "/Users/tkejzlar/Library/CloudStorage/Dropbox/scripts/garden-os/routes/succession.rb:213:in
+    'block (3 levels) in <class:GardenApp>'"
+  - "/Users/tkejzlar/Library/CloudStorage/Dropbox/scripts/garden-os/services/planner_service.rb:172:in
+    'block in PlannerService#send_message_streaming'"
+  - "/Users/tkejzlar/.rvm/gems/ruby-3.4.9/gems/ruby_llm-1.13.2/lib/ruby_llm/chat.rb:230:in
+    'block in RubyLLM::Chat#wrap_streaming_block'"
+  - "/Users/tkejzlar/.rvm/gems/ruby-3.4.9/gems/ruby_llm-1.13.2/lib/ruby_llm/streaming.rb:21:in
+    'block (2 levels) in RubyLLM::Streaming#stream_response'"
+  - "/Users/tkejzlar/.rvm/gems/ruby-3.4.9/gems/ruby_llm-1.13.2/lib/ruby_llm/streaming.rb:33:in
+    'block in RubyLLM::Streaming#handle_stream'"
+  - "/Users/tkejzlar/.rvm/gems/ruby-3.4.9/gems/ruby_llm-1.13.2/lib/ruby_llm/streaming.rb:97:in
+    'block in RubyLLM::Streaming#handle_sse'"
+  - "/Users/tkejzlar/.rvm/gems/ruby-3.4.9/gems/event_stream_parser-1.0.0/lib/event_stream_parser.rb:217:in
+    'EventStreamParser::Parser#dispatch_event'"
+timestamp: '2026-03-16T22:28:00+01:00'
+status: open

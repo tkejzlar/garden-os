@@ -21,6 +21,19 @@ class GardenApp < Sinatra::Base
     also_reload "services/*.rb"
   end
 
+  # ── CORS for Vite dev server ──────────────────────────────────────────
+  before do
+    if settings.development?
+      headers 'Access-Control-Allow-Origin' => '*',
+              'Access-Control-Allow-Methods' => 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+              'Access-Control-Allow-Headers' => 'Content-Type'
+    end
+  end
+
+  options '*' do
+    200
+  end
+
   before do
     require_relative "models/garden"
     garden_id = request.cookies["garden_id"]&.to_i
@@ -33,13 +46,80 @@ class GardenApp < Sinatra::Base
     garden = Garden[params[:id].to_i]
     halt 404 unless garden
     response.set_cookie("garden_id", value: garden.id.to_s, path: "/", httponly: true, same_site: :lax)
-    redirect back
+    if request.accept?('application/json')
+      json(ok: true, garden_id: garden.id)
+    else
+      redirect back
+    end
+  end
+
+  get "/api/gardens" do
+    json({
+      current_id: @current_garden.id,
+      gardens: @gardens.map { |g| { id: g.id, name: g.name } }
+    })
+  end
+
+  post "/api/gardens/switch/:id" do
+    require_relative "models/garden"
+    garden = Garden[params[:id].to_i]
+    halt 404 unless garden
+    response.set_cookie("garden_id", value: garden.id.to_s, path: "/", httponly: true, same_site: :lax)
+    json(ok: true, garden_id: garden.id)
   end
 
   get "/health" do
     json status: "ok"
   end
 
+  # ── Garden Journal/Quick Log ──
+  get "/api/journal" do
+    require_relative "models/garden_log"
+    logs = GardenLog.where(garden_id: @current_garden.id).order(Sequel.desc(:created_at)).limit(50).all
+    json logs.map(&:values)
+  end
+
+  post "/api/journal" do
+    require_relative "models/garden_log"
+    request.body.rewind
+    body = begin JSON.parse(request.body.read) rescue {} end
+    log = GardenLog.create(
+      garden_id: @current_garden.id,
+      log_type: body["type"] || "note",
+      note: body["note"],
+      created_at: Time.now
+    )
+    status 201
+    json log.values
+  end
+
+  # ── Tasks JSON API ──
+  get "/api/tasks" do
+    require_relative "models/task"
+    tasks = Task.where(garden_id: @current_garden.id).exclude(status: "done").order(:due_date).all
+    json tasks.map { |t|
+      bed_names = (t.respond_to?(:bed_names) ? t.bed_names : nil) || []
+      { id: t.id, title: t.title, due_date: t.due_date&.to_s, status: t.status, priority: t.priority || "normal", bed_names: bed_names }
+    }
+  end
+
+  post "/api/tasks/:id/complete" do
+    require_relative "models/task"
+    task = Task[params[:id].to_i]
+    halt 404 unless task
+    task.update(status: "done", completed_at: Time.now)
+    json(ok: true)
+  end
+
+  not_found do
+    @title = "Not Found"
+    erb :error, locals: { code: 404, message: "Page not found" }
+  end
+
+  error do
+    @title = "Error"
+    erb :error, locals: { code: 500, message: "Something went wrong" }
+  end
 
 end
 
@@ -59,5 +139,22 @@ class GardenApp
       tasks_today: Task.where(due_date: Date.today).exclude(status: "done").count,
       germinating: Plant.where(lifecycle_stage: "germinating").count
     )
+  end
+
+  # ── Cache hashed assets forever ──
+  before '/dist/assets/*' do
+    headers "Cache-Control" => "public, max-age=31536000, immutable"
+  end
+
+  # ── SPA catch-all: serve React app for non-API routes ──
+  # This must be the LAST route. Only activates if public/dist/index.html exists.
+  get "/*" do
+    spa_index = File.join(settings.public_folder, "dist", "index.html")
+    if File.exist?(spa_index) && !request.path_info.start_with?("/api/")
+      headers "Cache-Control" => "public, max-age=0, must-revalidate"
+      send_file spa_index
+    else
+      halt 404
+    end
   end
 end

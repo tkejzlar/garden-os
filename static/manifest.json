@@ -1,0 +1,24 @@
+{
+  "name": "GardenOS",
+  "short_name": "Garden",
+  "description": "Garden management — what to do today",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F0FDF4",
+  "theme_color": "#15803D",
+  "scope": "/",
+  "orientation": "any",
+  "categories": ["lifestyle", "utilities"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

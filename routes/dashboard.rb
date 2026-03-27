@@ -7,7 +7,9 @@ require_relative "../services/weather_service"
 require_relative "../services/sensor_service"
 
 class GardenApp
-  get "/" do
+  # Dashboard page route removed — React SPA serves /
+
+  get "/api/dashboard" do
     @today_tasks = Task.where(garden_id: @current_garden.id, due_date: Date.today)
                        .exclude(status: "done")
                        .order(:priority).all
@@ -23,21 +25,27 @@ class GardenApp
 
     @weather = WeatherService.fetch_current
 
-    # Sensor data — only fetch if at least one entity is configured
+    sensors = {}
     if sensor_vars_configured?
-      @sensor_zones    = SensorService.fetch_zones
-      @sensor_temp     = SensorService.fetch_indoor_temp
-      @sensor_rain     = SensorService.rain_detected?
-      @sensors_present = true
+      sensors[:zones]    = SensorService.fetch_zones
+      sensors[:temp]     = SensorService.fetch_indoor_temp
+      sensors[:rain]     = SensorService.rain_detected?
+      sensors[:present]  = true
     else
-      @sensors_present = false
+      sensors[:present] = false
     end
 
-    @germination_count = @germination_watch.count
-    @upcoming_count = @upcoming_tasks.count
-    @today_count = @today_tasks.count
-
-    erb :dashboard
+    json({
+      today_tasks:        @today_tasks.map(&:values),
+      upcoming_tasks:     @upcoming_tasks.map(&:values),
+      germination_watch:  @germination_watch.map(&:values),
+      advisories:         @advisories.map(&:values),
+      weather:            @weather,
+      sensors:            sensors,
+      germination_count:  @germination_watch.count,
+      upcoming_count:     @upcoming_tasks.count,
+      today_count:        @today_tasks.count
+    })
   end
 
   private

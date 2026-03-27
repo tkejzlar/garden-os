@@ -2,33 +2,7 @@ require_relative "../models/succession_plan"
 require_relative "../models/task"
 
 class GardenApp
-  get "/succession" do
-    @plans = SuccessionPlan.where(garden_id: @current_garden.id).all
-    require_relative "../models/planner_message"
-    @planner_messages = PlannerMessage.where(garden_id: @current_garden.id).order(:created_at).all
-    @all_tasks = Task.where(garden_id: @current_garden.id).exclude(status: "done").order(:due_date).all
-    @done_tasks = Task.where(garden_id: @current_garden.id, status: "done").order(Sequel.desc(:completed_at)).limit(10).all
-
-    today = Date.today
-    week_end = today + 7
-
-    @overdue_count = Task.where(garden_id: @current_garden.id)
-      .exclude(status: %w[done skipped])
-      .where { due_date < today }
-      .count
-
-    @due_this_week_count = Task.where(garden_id: @current_garden.id)
-      .exclude(status: %w[done skipped])
-      .where(due_date: today..week_end)
-      .count
-
-    @done_count = Task.where(garden_id: @current_garden.id, status: "done").count
-    @total_task_count = Task.where(garden_id: @current_garden.id).count
-    @total_plants = Plant.where(garden_id: @current_garden.id).count
-    @succession_count = SuccessionPlan.where(garden_id: @current_garden.id).count
-
-    erb :succession
-  end
+  # Succession page route removed — React SPA serves /plan
 
   get "/api/succession/gantt" do
     today = Date.today
@@ -174,16 +148,7 @@ class GardenApp
 
   # ── Succession Plan CRUD ──────────────────────────────────────────────────
 
-  get "/succession/plans/new" do
-    @plan = SuccessionPlan.new
-    erb :succession_form
-  end
-
-  get "/succession/plans/:id/edit" do
-    @plan = SuccessionPlan[params[:id].to_i]
-    halt 404 unless @plan
-    erb :succession_form
-  end
+  # Succession form routes removed — React SPA handles plan creation/editing
 
   post "/succession/plans" do
     plan = SuccessionPlan.create(
@@ -419,5 +384,64 @@ class GardenApp
     require_relative "../models/planner_message"
     PlannerMessage.where(garden_id: @current_garden.id).delete
     json(success: true)
+  end
+
+  # ── API-prefixed duplicates (SPA) ──────────────────────────────────────
+
+  post "/api/planner/ask" do
+    request.body.rewind
+    body = begin
+      JSON.parse(request.body.read)
+    rescue
+      halt 400, json(error: "Invalid JSON")
+    end
+
+    message = body["message"].to_s.strip
+    halt 400, json(error: "message required") if message.empty?
+
+    if body["context"]
+      ctx = body["context"]
+      parts = ["[Context: viewing #{ctx['view']} tab"]
+      parts << ", bed #{ctx['bed_name']}" if ctx["bed_name"]
+      parts << ", #{ctx['empty_slots']} empty slots" if ctx["empty_slots"]
+      parts << ", plants: #{ctx['current_plants'].join(', ')}" if ctx["current_plants"]&.any?
+      parts << "]"
+      message = parts.join + " " + message
+    end
+
+    require_relative "../services/planner_service"
+    require_relative "../services/garden_logger"
+
+    garden_id = @current_garden.id
+
+    content_type "text/event-stream"
+    headers "Cache-Control" => "no-cache", "Connection" => "keep-alive"
+
+    stream(:keep_open) do |out|
+      Thread.current[:current_garden_id] = garden_id
+      service = PlannerService.new
+
+      service.send_message_streaming(message) do |event|
+        break if out.closed?
+        out << "data: #{JSON.generate(event)}\n\n"
+      end
+      out.close unless out.closed?
+    end
+  end
+
+  post "/api/planner/commit" do
+    request.body.rewind
+    body = begin
+      JSON.parse(request.body.read)
+    rescue
+      halt 400, json(error: "Invalid JSON")
+    end
+
+    draft = body["draft_payload"]
+    halt 400, json(error: "draft_payload required") unless draft.is_a?(Hash)
+
+    require_relative "../services/plan_committer"
+    result = PlanCommitter.commit!(draft, garden_id: @current_garden.id)
+    json result
   end
 end

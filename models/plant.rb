@@ -11,31 +11,33 @@ class Plant < Sequel::Model
   one_to_many :photos
   many_to_many :tasks
 
-  # Default grid sizes per crop type (in 10cm cells)
+  # Default grid sizes per crop type (in 5cm cells)
+  # Sized for intensive raised bed gardening with staking/trellising
   CROP_SPACING = {
-    "tomato"    => [4, 4],  # 40×40cm
-    "pepper"    => [3, 3],  # 30×30cm
-    "eggplant"  => [4, 4],  # 40×40cm
-    "lettuce"   => [2, 2],  # 20×20cm
-    "spinach"   => [2, 2],
-    "chard"     => [3, 3],
-    "kale"      => [3, 3],
-    "herb"      => [2, 2],  # 20×20cm
-    "basil"     => [2, 2],
-    "cucumber"  => [3, 4],  # 30×40cm
-    "squash"    => [4, 4],
-    "zucchini"  => [4, 4],
-    "melon"     => [4, 4],
-    "flower"    => [2, 2],
-    "radish"    => [1, 1],  # 10×10cm (dense)
-    "carrot"    => [1, 1],
-    "onion"     => [1, 1],
-    "bean"      => [2, 3],
-    "pea"       => [2, 3],
+    "tomato"    => [6, 6],  # 30×30cm — staked/pruned to single stem
+    "pepper"    => [6, 6],  # 30×30cm
+    "eggplant"  => [6, 6],  # 30×30cm
+    "lettuce"   => [4, 4],  # 20×20cm
+    "spinach"   => [2, 4],  # 10×20cm — narrow rows
+    "chard"     => [4, 6],  # 20×30cm
+    "kale"      => [6, 6],  # 30×30cm
+    "herb"      => [4, 4],  # 20×20cm
+    "basil"     => [4, 4],  # 20×20cm
+    "cucumber"  => [6, 6],  # 30×30cm — trellised vertically
+    "squash"    => [8, 8],  # 40×40cm — these are genuinely big
+    "zucchini"  => [6, 8],  # 30×40cm
+    "melon"     => [8, 8],  # 40×40cm
+    "flower"    => [4, 4],  # 20×20cm
+    "radish"    => [2, 2],  # 10×10cm — dense
+    "carrot"    => [2, 2],  # 10×10cm — dense
+    "onion"     => [2, 2],  # 10×10cm — dense
+    "bean"      => [4, 4],  # 20×20cm — pole beans, trellised
+    "pea"       => [2, 4],  # 10×20cm — trellised
   }.freeze
 
   def self.default_grid_size(crop_type)
-    CROP_SPACING[crop_type.to_s.downcase] || [2, 2]
+    require_relative "crop_default"
+    CropDefault.grid_size(crop_type) || CROP_SPACING[crop_type.to_s.downcase] || [2, 2]
   end
 
   LIFECYCLE_STAGES = %w[
@@ -63,6 +65,10 @@ class Plant < Sequel::Model
 
   def advance_stage!(new_stage, note: nil)
     raise ArgumentError, "Invalid stage: #{new_stage}" unless LIFECYCLE_STAGES.include?(new_stage)
+
+    current_idx = LIFECYCLE_STAGES.index(lifecycle_stage) || -1
+    new_idx = LIFECYCLE_STAGES.index(new_stage)
+    raise ArgumentError, "Cannot move backward: #{lifecycle_stage} → #{new_stage}" if new_idx <= current_idx
 
     old_stage = lifecycle_stage
     DB.transaction do

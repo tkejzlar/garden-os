@@ -14,7 +14,7 @@ class Bed < Sequel::Model
       w = (xs.max - xs.min).to_f if xs.any?
     end
     w = 100.0 if w <= 0
-    (w / 10.0).ceil.clamp(1, 50)
+    (w / 5.0).ceil.clamp(1, 100)
   end
 
   def grid_rows
@@ -25,7 +25,7 @@ class Bed < Sequel::Model
       l = (ys.max - ys.min).to_f if ys.any?
     end
     l = 100.0 if l <= 0
-    (l / 10.0).ceil.clamp(1, 50)
+    (l / 5.0).ceil.clamp(1, 100)
   end
 
   def canvas_points_array

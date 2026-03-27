@@ -34,4 +34,18 @@ class GardenApp
                 .exclude(status: "done").all
     json tasks.map(&:values)
   end
+
+  post "/api/tasks/:id/snooze" do
+    content_type :json
+    task = Task[params[:id].to_i]
+    halt 404, json(error: "Not found") unless task
+
+    request.body.rewind
+    body = begin JSON.parse(request.body.read) rescue {} end
+    days = (body["days"] || 1).to_i
+
+    new_date = Date.today + days
+    task.update(due_date: new_date, updated_at: Time.now)
+    json(ok: true, new_date: new_date.to_s)
+  end
 end
