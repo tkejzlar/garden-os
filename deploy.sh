@@ -36,7 +36,7 @@ ruby -c app.rb > /dev/null
 echo ""
 echo "✓ Build complete!"
 echo ""
-echo "  Static files: public/dist/"
+echo "  Static files: dist/"
 echo "  Start server:  RACK_ENV=production bundle exec puma -C config/puma.rb config.ru"
 echo ""
 echo "  Or with PORT:  PORT=8080 RACK_ENV=production bundle exec puma -C config/puma.rb config.ru"

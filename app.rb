@@ -141,15 +141,21 @@ class GardenApp
     )
   end
 
-  # ── Cache hashed assets forever ──
-  before '/dist/assets/*' do
-    headers "Cache-Control" => "public, max-age=31536000, immutable"
+  # ── Serve SPA static assets from dist/ ──
+  # Hashed assets get immutable caching
+  get "/assets/*" do
+    asset_path = File.join(File.dirname(__FILE__), "dist", "assets", params[:splat].first)
+    if File.exist?(asset_path)
+      headers "Cache-Control" => "public, max-age=31536000, immutable"
+      send_file asset_path
+    else
+      halt 404
+    end
   end
 
   # ── SPA catch-all: serve React app for non-API routes ──
-  # This must be the LAST route. Only activates if public/dist/index.html exists.
   get "/*" do
-    spa_index = File.join(settings.public_folder, "dist", "index.html")
+    spa_index = File.join(File.dirname(__FILE__), "dist", "index.html")
     if File.exist?(spa_index) && !request.path_info.start_with?("/api/")
       headers "Cache-Control" => "public, max-age=0, must-revalidate"
       send_file spa_index

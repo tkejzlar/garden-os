@@ -19,7 +19,7 @@ export default defineConfig({
   },
   publicDir: 'static',  // avoid conflict with Sinatra's public/
   build: {
-    outDir: 'public/dist',
+    outDir: 'dist',
     emptyOutDir: true,
   }
 })

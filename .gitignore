@@ -9,4 +9,4 @@ log/
 .superpowers/
 .worktrees/
 node_modules/
-public/dist/
+dist/
