@@ -48,6 +48,22 @@ class GardenApp
     })
   end
 
+  get "/api/feature-requests" do
+    gaps_dir = File.join(settings.root, "docs", "gaps")
+    unless File.directory?(gaps_dir)
+      return json([])
+    end
+
+    require "yaml"
+    requests = Dir.glob(File.join(gaps_dir, "*-feature-request.yml")).map do |f|
+      data = YAML.safe_load(File.read(f))
+      data["file"] = File.basename(f)
+      data
+    end.sort_by { |r| r["timestamp"] || "" }.reverse
+
+    json(requests)
+  end
+
   private
 
   def sensor_vars_configured?

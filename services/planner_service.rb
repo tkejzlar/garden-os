@@ -9,6 +9,7 @@ require_relative "planner_tools/get_succession_plans_tool"
 require_relative "planner_tools/get_weather_tool"
 require_relative "planner_tools/draft_plan_tool"
 require_relative "planner_tools/draft_bed_layout_tool"
+require_relative "planner_tools/request_feature_tool"
 
 class PlannerService
   attr_reader :last_draft
@@ -67,6 +68,12 @@ class PlannerService
 
       Be opinionated. If something doesn't make horticultural sense, say so.
 
+      SELF-REPORTING: If the user asks you to do something you lack a tool for
+      (e.g., edit bed dimensions, move a plant between beds, delete a plant,
+      update seed stock, rename a bed), call request_feature to log it. Tell the
+      user: "I can't do that yet — I've logged a feature request for [capability]."
+      Don't just apologize — actively flag the gap.
+
       Prague climate:
       - Indoor sowing: Feb-April (peppers early Feb, tomatoes early March)
       - Last frost: ~May 13 (Ice Saints)
@@ -89,6 +96,7 @@ class PlannerService
         .with_tool(GetWeatherTool)
         .with_tool(DraftPlanTool)
         .with_tool(DraftBedLayoutTool)
+        .with_tool(RequestFeatureTool)
 
       # Log tool calls
       c.on_tool_call do |tool_call|
