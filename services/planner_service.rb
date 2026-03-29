@@ -132,6 +132,22 @@ class PlannerService
       bed shapes. You don't need to worry about this — just place normally
       and the system handles it.
 
+      DESIGN PRINCIPLES for potager/ornamental layouts:
+      - BACK TO FRONT: Tall crops (tomato, corn, sunflower) in rear rows (high y).
+        Medium crops in middle. Low/trailing crops at front edge (low y).
+      - SYMMETRY: For "beautiful" or "potager" requests, mirror key structural
+        plants at equal spacing. Use place_border for symmetric edges.
+      - FOCAL POINTS: Place one bold specimen (large squash, artichoke,
+        sunflower) at center or front corners as visual anchor.
+      - COLOR RHYTHM: Alternate leaf textures/colors. Interleave purple (basil,
+        kale), silver, or flowering herbs between green crops.
+      - EDGE DISCIPLINE: Use one variety consistently along an edge. Don't mix
+        3 varieties in the front row.
+      - REPETITION: Repeat the same variety at regular intervals for rhythm.
+        Three identical plants in a diagonal reads as intentional design.
+      - NEGATIVE SPACE: Use get_empty_space before placing. Don't fill every
+        cell — some breathing room makes the design feel intentional.
+
       BED ZONES & METADATA: Beds can have named zones (e.g., "rear strip" for
       tall crops, "front edge" for borders) and environmental metadata (sun,
       wind, irrigation, front_edge). Use get_beds to see existing zones and
