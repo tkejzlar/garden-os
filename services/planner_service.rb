@@ -24,6 +24,8 @@ require_relative "planner_tools/manage_zones_tool"
 require_relative "planner_tools/update_bed_metadata_tool"
 require_relative "planner_tools/deduplicate_bed_tool"
 require_relative "planner_tools/set_plant_notes_tool"
+require_relative "planner_tools/update_succession_plan_tool"
+require_relative "planner_tools/deduplicate_succession_plans_tool"
 
 class PlannerService
   attr_reader :last_draft
@@ -88,6 +90,8 @@ class PlannerService
       - move_plant: Move a plant to a different bed
       - update_plant: Change a plant's grid position, size, or quantity
       - delete_succession_plan: Remove succession schedules and their pending tasks
+      - update_succession_plan: Edit an existing succession plan's interval, dates, beds
+      - deduplicate_succession_plans: Merge duplicate plans for the same crop
 
       These tools execute immediately — no draft/commit flow. Always confirm
       with the user before bulk destructive operations like clear_bed.
@@ -168,6 +172,8 @@ class PlannerService
         .with_tool(UpdateBedMetadataTool)
         .with_tool(DeduplicateBedTool)
         .with_tool(SetPlantNotesTool)
+        .with_tool(UpdateSuccessionPlanTool)
+        .with_tool(DeduplicateSuccessionPlansTool)
 
       # Log tool calls
       c.on_tool_call do |tool_call|
