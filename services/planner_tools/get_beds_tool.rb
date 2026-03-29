@@ -1,6 +1,7 @@
 require "ruby_llm"
 require_relative "../../models/bed"
 require_relative "../../models/plant"
+require_relative "../../models/bed_zone"
 
 class GetBedsTool < RubyLLM::Tool
   description "Get all garden beds with dimensions, grid layout, and which plants are currently assigned"
@@ -47,7 +48,14 @@ class GetBedsTool < RubyLLM::Tool
         grid_cols: bed.grid_cols,
         grid_rows: bed.grid_rows,
         plants: plants,
-        total_plants: plants.length
+        total_plants: plants.length,
+        zones: BedZone.where(bed_id: bed.id).all.map { |z|
+          { name: z.name, from_x: z.from_x, from_y: z.from_y, to_x: z.to_x, to_y: z.to_y, purpose: z.purpose, notes: z.notes }
+        },
+        sun_exposure: bed.sun_exposure,
+        wind_exposure: bed.wind_exposure,
+        irrigation: bed.irrigation,
+        front_edge: bed.front_edge,
       }
     end
 

@@ -4,6 +4,7 @@ require_relative "../config/database"
 class Bed < Sequel::Model
   many_to_one :garden
   one_to_many :plants
+  one_to_many :bed_zones
 
   def grid_cols
     w = (width || 0).to_f

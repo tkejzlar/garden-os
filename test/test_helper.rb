@@ -8,6 +8,8 @@ require_relative "../app"
 
 if Dir["db/migrations/*.rb"].any?
   Sequel::Migrator.run(DB, "db/migrations", allow_missing_migration_files: true)
+  # Reset cached column schema so models pick up any newly added columns
+  ObjectSpace.each_object(Class).select { |c| c < Sequel::Model }.each { |m| m.instance_variable_set(:@db_schema, nil) rescue nil }
 end
 
 require_relative "../models/garden"
