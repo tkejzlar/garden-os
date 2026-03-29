@@ -372,8 +372,9 @@ class GardenApp
       halt 400, json(error: "Invalid JSON")
     end
 
-    draft = body["draft_payload"]
-    halt 400, json(error: "draft_payload required") unless draft.is_a?(Hash)
+    # Accept either { draft_payload: {...} } or the draft object directly
+    draft = body.is_a?(Hash) && body["draft_payload"].is_a?(Hash) ? body["draft_payload"] : body
+    halt 400, json(error: "draft_payload required") unless draft.is_a?(Hash) && (draft["assignments"] || draft["tasks"] || draft["successions"])
 
     require_relative "../services/plan_committer"
     result = PlanCommitter.commit!(draft, garden_id: @current_garden.id)
@@ -437,8 +438,9 @@ class GardenApp
       halt 400, json(error: "Invalid JSON")
     end
 
-    draft = body["draft_payload"]
-    halt 400, json(error: "draft_payload required") unless draft.is_a?(Hash)
+    # Accept either { draft_payload: {...} } or the draft object directly
+    draft = body.is_a?(Hash) && body["draft_payload"].is_a?(Hash) ? body["draft_payload"] : body
+    halt 400, json(error: "draft_payload required") unless draft.is_a?(Hash) && (draft["assignments"] || draft["tasks"] || draft["successions"])
 
     require_relative "../services/plan_committer"
     result = PlanCommitter.commit!(draft, garden_id: @current_garden.id)
