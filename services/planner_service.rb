@@ -20,6 +20,8 @@ require_relative "planner_tools/place_column_tool"
 require_relative "planner_tools/place_single_tool"
 require_relative "planner_tools/place_border_tool"
 require_relative "planner_tools/place_fill_tool"
+require_relative "planner_tools/manage_zones_tool"
+require_relative "planner_tools/update_bed_metadata_tool"
 
 class PlannerService
   attr_reader :last_draft
@@ -108,6 +110,13 @@ class PlannerService
       5. Fill remaining space with place_fill
       These tools skip occupied cells, so order matters — place large items first.
 
+      BED ZONES & METADATA: Beds can have named zones (e.g., "rear strip" for
+      tall crops, "front edge" for borders) and environmental metadata (sun,
+      wind, irrigation, front_edge). Use get_beds to see existing zones and
+      metadata. Use manage_zones to define zones, update_bed_metadata to set
+      environmental info. When placing plants, respect zones — put tall crops
+      in rear zones, borders in front edge zones, etc.
+
       SELF-REPORTING: If the user asks you to do something you lack a tool for,
       call request_feature to log it. Tell the user: "I can't do that yet —
       I've logged a feature request for [capability]."
@@ -145,6 +154,8 @@ class PlannerService
         .with_tool(PlaceSingleTool)
         .with_tool(PlaceBorderTool)
         .with_tool(PlaceFillTool)
+        .with_tool(ManageZonesTool)
+        .with_tool(UpdateBedMetadataTool)
 
       # Log tool calls
       c.on_tool_call do |tool_call|
