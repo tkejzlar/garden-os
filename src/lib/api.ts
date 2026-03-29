@@ -244,7 +244,7 @@ export interface DashboardData {
 }
 
 export interface SSEEvent {
-  type: 'chunk' | 'draft' | 'bed_layout' | 'error' | 'done'
+  type: 'chunk' | 'draft' | 'bed_layout' | 'refresh' | 'error' | 'done'
   content?: string
   [key: string]: unknown
 }
