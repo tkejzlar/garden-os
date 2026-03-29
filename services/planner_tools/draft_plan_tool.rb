@@ -1,4 +1,6 @@
 require "ruby_llm"
+require_relative "../../models/bed"
+require_relative "../../models/plant"
 
 class DraftPlanTool < RubyLLM::Tool
   description "Create a draft garden plan. The user will see a visual preview and can request changes before committing. Call this when you have a plan ready."
@@ -12,7 +14,27 @@ class DraftPlanTool < RubyLLM::Tool
     a = parsed["assignments"]&.length || 0
     s = parsed["successions"]&.length || 0
     t = parsed["tasks"]&.length || 0
-    "Draft stored: #{a} plant assignments, #{s} succession schedules, #{t} tasks. Present a summary to the user — they'll see a visual card with a 'Create this plan' button."
+
+    # Check for duplicate assignments
+    warnings = []
+    garden_id = Thread.current[:current_garden_id]
+    (parsed["assignments"] || []).each do |assignment|
+      bed = Bed.where(name: assignment["bed_name"], garden_id: garden_id).first
+      next unless bed
+      existing = Plant.where(
+        bed_id: bed.id,
+        variety_name: assignment["variety_name"],
+        crop_type: assignment["crop_type"]
+      ).exclude(lifecycle_stage: "done").count
+      if existing > 0
+        warnings << "#{assignment['bed_name']} already has #{existing} #{assignment['variety_name']} (#{assignment['crop_type']})"
+      end
+    end
+
+    msg = "Draft stored: #{a} plant assignments, #{s} succession schedules, #{t} tasks."
+    msg += " WARNINGS: #{warnings.join('; ')}. Ask the user whether to replace or add." if warnings.any?
+    msg += " Present a summary to the user — they'll see a visual card with a 'Create this plan' button."
+    msg
   rescue JSON::ParserError => e
     "Error: Invalid JSON. #{e.message}"
   end
