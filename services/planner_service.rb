@@ -10,6 +10,11 @@ require_relative "planner_tools/get_weather_tool"
 require_relative "planner_tools/draft_plan_tool"
 require_relative "planner_tools/draft_bed_layout_tool"
 require_relative "planner_tools/request_feature_tool"
+require_relative "planner_tools/clear_bed_tool"
+require_relative "planner_tools/remove_plants_tool"
+require_relative "planner_tools/move_plant_tool"
+require_relative "planner_tools/update_plant_tool"
+require_relative "planner_tools/delete_succession_plan_tool"
 
 class PlannerService
   attr_reader :last_draft
@@ -68,11 +73,24 @@ class PlannerService
 
       Be opinionated. If something doesn't make horticultural sense, say so.
 
-      SELF-REPORTING: If the user asks you to do something you lack a tool for
-      (e.g., edit bed dimensions, move a plant between beds, delete a plant,
-      update seed stock, rename a bed), call request_feature to log it. Tell the
-      user: "I can't do that yet — I've logged a feature request for [capability]."
-      Don't just apologize — actively flag the gap.
+      GARDEN MANAGEMENT: You have tools to modify the garden directly:
+      - clear_bed: Remove ALL plants from a bed (confirm with user first!)
+      - remove_plants: Remove specific plants by variety, crop type, or IDs
+      - move_plant: Move a plant to a different bed
+      - update_plant: Change a plant's grid position, size, or quantity
+      - delete_succession_plan: Remove succession schedules and their pending tasks
+
+      These tools execute immediately — no draft/commit flow. Always confirm
+      with the user before bulk destructive operations like clear_bed.
+
+      When redesigning a bed:
+      1. First clear or remove unwanted plants
+      2. Then use draft_plan or draft_bed_layout to add new ones
+      3. Check for duplicates before adding
+
+      SELF-REPORTING: If the user asks you to do something you lack a tool for,
+      call request_feature to log it. Tell the user: "I can't do that yet —
+      I've logged a feature request for [capability]."
 
       Prague climate:
       - Indoor sowing: Feb-April (peppers early Feb, tomatoes early March)
@@ -97,6 +115,11 @@ class PlannerService
         .with_tool(DraftPlanTool)
         .with_tool(DraftBedLayoutTool)
         .with_tool(RequestFeatureTool)
+        .with_tool(ClearBedTool)
+        .with_tool(RemovePlantsTool)
+        .with_tool(MovePlantTool)
+        .with_tool(UpdatePlantTool)
+        .with_tool(DeleteSuccessionPlanTool)
 
       # Log tool calls
       c.on_tool_call do |tool_call|
