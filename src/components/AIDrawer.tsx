@@ -33,7 +33,7 @@ function SafeMarkdown({ content }: { content: string }) {
   const html = renderMarkdown(content)
   return (
     <div
-      className="prose prose-sm prose-green max-w-none [&_p]:my-1 [&_ul]:my-1 [&_li]:my-0 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1"
+      className="ai-markdown"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   )
