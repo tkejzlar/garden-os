@@ -15,6 +15,11 @@ require_relative "planner_tools/remove_plants_tool"
 require_relative "planner_tools/move_plant_tool"
 require_relative "planner_tools/update_plant_tool"
 require_relative "planner_tools/delete_succession_plan_tool"
+require_relative "planner_tools/place_row_tool"
+require_relative "planner_tools/place_column_tool"
+require_relative "planner_tools/place_single_tool"
+require_relative "planner_tools/place_border_tool"
+require_relative "planner_tools/place_fill_tool"
 
 class PlannerService
   attr_reader :last_draft
@@ -88,6 +93,21 @@ class PlannerService
       2. Then use draft_plan or draft_bed_layout to add new ones
       3. Check for duplicates before adding
 
+      LAYOUT TOOLS: For precise, intentional bed designs:
+      - place_row: Horizontal row of plants (e.g., row of lettuce across front)
+      - place_column: Vertical column (e.g., tomatoes up the back)
+      - place_single: One plant at exact position (e.g., courgette in corner)
+      - place_border: Plants along edges (e.g., marigold border on front+sides)
+      - place_fill: Fill a region with plants at spacing (e.g., radishes in remaining space)
+
+      For potager-style layouts, use layout tools instead of draft_plan:
+      1. Clear the bed if needed
+      2. Place tall crops in back rows (place_column or place_row at high y)
+      3. Place medium crops in middle
+      4. Place borders/edges with place_border
+      5. Fill remaining space with place_fill
+      These tools skip occupied cells, so order matters — place large items first.
+
       SELF-REPORTING: If the user asks you to do something you lack a tool for,
       call request_feature to log it. Tell the user: "I can't do that yet —
       I've logged a feature request for [capability]."
@@ -120,6 +140,11 @@ class PlannerService
         .with_tool(MovePlantTool)
         .with_tool(UpdatePlantTool)
         .with_tool(DeleteSuccessionPlanTool)
+        .with_tool(PlaceRowTool)
+        .with_tool(PlaceColumnTool)
+        .with_tool(PlaceSingleTool)
+        .with_tool(PlaceBorderTool)
+        .with_tool(PlaceFillTool)
 
       # Log tool calls
       c.on_tool_call do |tool_call|
