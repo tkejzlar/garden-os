@@ -4,6 +4,7 @@ ENV["DATABASE_URL"] = "sqlite://db/garden_os_test.db"
 require "minitest/autorun"
 require "rack/test"
 require_relative "../config/database"
+require_relative "../app"
 
 if Dir["db/migrations/*.rb"].any?
   Sequel::Migrator.run(DB, "db/migrations", allow_missing_migration_files: true)
