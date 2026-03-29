@@ -30,6 +30,8 @@ require_relative "planner_tools/place_in_zone_tool"
 require_relative "planner_tools/align_plants_tool"
 require_relative "planner_tools/group_edit_tool"
 require_relative "planner_tools/place_band_tool"
+require_relative "planner_tools/copy_layout_tool"
+require_relative "planner_tools/get_empty_space_tool"
 
 class PlannerService
   attr_reader :last_draft
@@ -123,6 +125,12 @@ class PlannerService
       - align_plants: Align/distribute plants (align-left/right/top/bottom, center-h/v, distribute-h/v, compact)
       - group_edit: Batch move (dx/dy) or resize plants by variety/crop filter
       - place_band: Wide seed-row or block for broadcast-sown crops (radish, mesclun)
+      - copy_layout: Copy or mirror (horizontal/vertical) a bed layout to another bed
+      - get_empty_space: Report empty space percentage and largest gaps on a bed
+
+      POLYGON BEDS: Placement tools automatically skip cells outside polygon
+      bed shapes. You don't need to worry about this — just place normally
+      and the system handles it.
 
       BED ZONES & METADATA: Beds can have named zones (e.g., "rear strip" for
       tall crops, "front edge" for borders) and environmental metadata (sun,
@@ -186,6 +194,8 @@ class PlannerService
         .with_tool(AlignPlantsTool)
         .with_tool(GroupEditTool)
         .with_tool(PlaceBandTool)
+        .with_tool(CopyLayoutTool)
+        .with_tool(GetEmptySpaceTool)
 
       # Log tool calls
       c.on_tool_call do |tool_call|
