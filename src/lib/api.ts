@@ -173,6 +173,7 @@ export interface BedPlant {
   grid_w: number
   grid_h: number
   quantity: number
+  notes: string | null
 }
 
 export interface Plant {

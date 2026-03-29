@@ -35,7 +35,7 @@ class GardenApp
         { id: p.id, variety_name: p.variety_name, crop_type: p.crop_type,
           lifecycle_stage: p.lifecycle_stage,
           grid_x: p.grid_x, grid_y: p.grid_y, grid_w: p.grid_w, grid_h: p.grid_h,
-          quantity: p.quantity }
+          quantity: p.quantity, notes: p.notes }
       }
     })
   end
@@ -56,7 +56,7 @@ class GardenApp
           { id: p.id, variety_name: p.variety_name, crop_type: p.crop_type,
             lifecycle_stage: p.lifecycle_stage,
             grid_x: p.grid_x, grid_y: p.grid_y, grid_w: p.grid_w, grid_h: p.grid_h,
-            quantity: p.quantity }
+            quantity: p.quantity, notes: p.notes }
         }
       }
     end
