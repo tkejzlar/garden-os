@@ -16,6 +16,7 @@ class ManageZonesTool < RubyLLM::Tool
   param :notes, type: :string, desc: "Additional notes (create only)"
 
   def execute(bed_name:, action:, name: nil, from_x: nil, from_y: nil, to_x: nil, to_y: nil, purpose: nil, notes: nil)
+    return "Error: bed_zones table not yet created — run migrations" unless DB.table_exists?(:bed_zones)
     garden_id = Thread.current[:current_garden_id]
     bed = Bed.where(name: bed_name, garden_id: garden_id).first
     return "Error: bed '#{bed_name}' not found" unless bed

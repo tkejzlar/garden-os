@@ -49,13 +49,13 @@ class GetBedsTool < RubyLLM::Tool
         grid_rows: bed.grid_rows,
         plants: plants,
         total_plants: plants.length,
-        zones: BedZone.where(bed_id: bed.id).all.map { |z|
+        zones: (DB.table_exists?(:bed_zones) ? BedZone.where(bed_id: bed.id).all.map { |z|
           { name: z.name, from_x: z.from_x, from_y: z.from_y, to_x: z.to_x, to_y: z.to_y, purpose: z.purpose, notes: z.notes }
-        },
-        sun_exposure: bed.sun_exposure,
-        wind_exposure: bed.wind_exposure,
-        irrigation: bed.irrigation,
-        front_edge: bed.front_edge,
+        } : []),
+        sun_exposure: (bed.respond_to?(:sun_exposure) ? bed.sun_exposure : nil),
+        wind_exposure: (bed.respond_to?(:wind_exposure) ? bed.wind_exposure : nil),
+        irrigation: (bed.respond_to?(:irrigation) ? bed.irrigation : nil),
+        front_edge: (bed.respond_to?(:front_edge) ? bed.front_edge : nil),
       }
     end
 

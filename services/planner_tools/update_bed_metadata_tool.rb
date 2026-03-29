@@ -11,6 +11,7 @@ class UpdateBedMetadataTool < RubyLLM::Tool
   param :front_edge, type: :string, desc: '"south", "north", "east", "west", or "path" — which side faces viewer (optional)'
 
   def execute(bed_name:, sun_exposure: nil, wind_exposure: nil, irrigation: nil, front_edge: nil)
+    return "Error: bed metadata columns not yet created — run migrations" unless Bed.columns.include?(:sun_exposure)
     garden_id = Thread.current[:current_garden_id]
     bed = Bed.where(name: bed_name, garden_id: garden_id).first
     return "Error: bed '#{bed_name}' not found" unless bed
