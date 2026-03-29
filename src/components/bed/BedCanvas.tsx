@@ -195,6 +195,30 @@ export default function BedCanvas({
     )
   }
 
+  let clipId: string | undefined
+  let clipDef: React.ReactNode = null
+  if (bed.canvas_points && bed.canvas_points.length > 2) {
+    clipId = `bed-clip-${bed.id}`
+    const xs = bed.canvas_points.map((p) => p[0])
+    const ys = bed.canvas_points.map((p) => p[1])
+    const minX = Math.min(...xs)
+    const minY = Math.min(...ys)
+    const polyW = Math.max(...xs) - minX
+    const polyH = Math.max(...ys) - minY
+    const scaleX = w / polyW
+    const scaleY = h / polyH
+    const clipPts = bed.canvas_points
+      .map((p) => `${(p[0] - minX) * scaleX},${(p[1] - minY) * scaleY}`)
+      .join(' ')
+    clipDef = (
+      <defs>
+        <clipPath id={clipId}>
+          <polygon points={clipPts} />
+        </clipPath>
+      </defs>
+    )
+  }
+
   // Build grid lines (every 2 cells = 10cm)
   const gridLines: React.ReactNode[] = []
   const gridStep = 2
@@ -272,43 +296,49 @@ export default function BedCanvas({
         </filter>
       </defs>
 
+      {/* Polygon clip path for non-rectangular beds */}
+      {clipDef}
+
       {/* Bed outline */}
       {outlineEl}
 
-      {/* Grid lines */}
-      {gridLines}
+      {/* Grid lines, drop target, and plants clipped to bed shape */}
+      <g clipPath={clipId ? `url(#${clipId})` : undefined}>
+        {/* Grid lines */}
+        {gridLines}
 
-      {/* Drop target during drag */}
-      {dropTarget && (
-        <rect
-          x={dropTarget.x}
-          y={dropTarget.y}
-          width={dropTarget.w}
-          height={dropTarget.h}
-          rx={3}
-          fill={dropTarget.colliding ? 'rgba(239,68,68,0.1)' : 'none'}
-          stroke={dropTarget.colliding ? '#ef4444' : '#365314'}
-          strokeWidth={1.5}
-          strokeDasharray="3,2"
-          opacity={0.5}
-          style={{ pointerEvents: 'none' }}
-        />
-      )}
+        {/* Drop target during drag */}
+        {dropTarget && (
+          <rect
+            x={dropTarget.x}
+            y={dropTarget.y}
+            width={dropTarget.w}
+            height={dropTarget.h}
+            rx={3}
+            fill={dropTarget.colliding ? 'rgba(239,68,68,0.1)' : 'none'}
+            stroke={dropTarget.colliding ? '#ef4444' : '#365314'}
+            strokeWidth={1.5}
+            strokeDasharray="3,2"
+            opacity={0.5}
+            style={{ pointerEvents: 'none' }}
+          />
+        )}
 
-      {/* Plant rects */}
-      {bed.plants.map((plant) => (
-        <PlantRect
-          key={plant.id}
-          plant={plant}
-          cell={CELL}
-          selected={selectedPlantId === plant.id}
-          onSelect={() => onSelectPlant(selectedPlantId === plant.id ? null : plant.id)}
-          onDragEnd={handlePlantDragEnd(plant.id, plant)}
-        />
-      ))}
+        {/* Plant rects */}
+        {bed.plants.map((plant) => (
+          <PlantRect
+            key={plant.id}
+            plant={plant}
+            cell={CELL}
+            selected={selectedPlantId === plant.id}
+            onSelect={() => onSelectPlant(selectedPlantId === plant.id ? null : plant.id)}
+            onDragEnd={handlePlantDragEnd(plant.id, plant)}
+          />
+        ))}
 
-      {/* Ghost preview for click-to-place */}
-      {ghostEl}
+        {/* Ghost preview for click-to-place */}
+        {ghostEl}
+      </g>
     </svg>
   )
 }
