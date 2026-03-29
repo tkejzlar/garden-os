@@ -22,7 +22,9 @@ class GardenTest < Minitest::Test
   end
 
   def setup
+    DB.run("PRAGMA foreign_keys = OFF")
     DB.tables.each { |t| DB[t].delete unless [:schema_migrations, :schema_info].include?(t) }
+    DB.run("PRAGMA foreign_keys = ON")
     @garden = Garden.create(name: "Test Garden", created_at: Time.now)
     set_cookie "garden_id=#{@garden.id}"
   end
