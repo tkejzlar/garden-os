@@ -210,6 +210,7 @@ class PlannerService
     # Send draft/bed_layout as final events if present
     block.call({ type: "draft", draft: @last_draft }) if @last_draft && block
     block.call({ type: "bed_layout", bed_layout: @last_bed_layout }) if @last_bed_layout && block
+    block.call({ type: "refresh" }) if Thread.current[:planner_needs_refresh] && block
 
     # Save to DB
     PlannerMessage.create(

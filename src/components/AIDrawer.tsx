@@ -90,6 +90,8 @@ export function AIDrawer({ context, onClose, open, onDraftApplied }: AIDrawerPro
         setDraft(event.draft as DraftPlan)
       } else if (event.type === 'bed_layout') {
         setBedLayout(event.bed_layout as BedLayout)
+      } else if (event.type === 'refresh') {
+        onDraftApplied?.()
       } else if (event.type === 'error') {
         toast.error(String(event.content || 'AI error — try again'))
         setStreaming(false)
