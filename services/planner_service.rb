@@ -26,6 +26,10 @@ require_relative "planner_tools/deduplicate_bed_tool"
 require_relative "planner_tools/set_plant_notes_tool"
 require_relative "planner_tools/update_succession_plan_tool"
 require_relative "planner_tools/deduplicate_succession_plans_tool"
+require_relative "planner_tools/place_in_zone_tool"
+require_relative "planner_tools/align_plants_tool"
+require_relative "planner_tools/group_edit_tool"
+require_relative "planner_tools/place_band_tool"
 
 class PlannerService
   attr_reader :last_draft
@@ -115,6 +119,10 @@ class PlannerService
       4. Place borders/edges with place_border
       5. Fill remaining space with place_fill
       These tools skip occupied cells, so order matters — place large items first.
+      - place_in_zone: Place plants within a named zone (fill, row, column, border, center)
+      - align_plants: Align/distribute plants (align-left/right/top/bottom, center-h/v, distribute-h/v, compact)
+      - group_edit: Batch move (dx/dy) or resize plants by variety/crop filter
+      - place_band: Wide seed-row or block for broadcast-sown crops (radish, mesclun)
 
       BED ZONES & METADATA: Beds can have named zones (e.g., "rear strip" for
       tall crops, "front edge" for borders) and environmental metadata (sun,
@@ -174,6 +182,10 @@ class PlannerService
         .with_tool(SetPlantNotesTool)
         .with_tool(UpdateSuccessionPlanTool)
         .with_tool(DeduplicateSuccessionPlansTool)
+        .with_tool(PlaceInZoneTool)
+        .with_tool(AlignPlantsTool)
+        .with_tool(GroupEditTool)
+        .with_tool(PlaceBandTool)
 
       # Log tool calls
       c.on_tool_call do |tool_call|
