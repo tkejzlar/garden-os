@@ -22,6 +22,8 @@ require_relative "planner_tools/place_border_tool"
 require_relative "planner_tools/place_fill_tool"
 require_relative "planner_tools/manage_zones_tool"
 require_relative "planner_tools/update_bed_metadata_tool"
+require_relative "planner_tools/deduplicate_bed_tool"
+require_relative "planner_tools/set_plant_notes_tool"
 
 class PlannerService
   attr_reader :last_draft
@@ -117,6 +119,14 @@ class PlannerService
       environmental info. When placing plants, respect zones — put tall crops
       in rear zones, borders in front edge zones, etc.
 
+      OPERATIONAL TOOLS:
+      - deduplicate_bed: Remove duplicate plants (same variety+crop) on a bed
+      - set_plant_notes: Annotate plants with design intent (e.g., "let spill over edge")
+
+      Before calling draft_plan, check if proposed assignments duplicate plants
+      already on target beds. If duplicates exist, mention them and ask whether
+      to replace (clear first) or add more.
+
       SELF-REPORTING: If the user asks you to do something you lack a tool for,
       call request_feature to log it. Tell the user: "I can't do that yet —
       I've logged a feature request for [capability]."
@@ -156,6 +166,8 @@ class PlannerService
         .with_tool(PlaceFillTool)
         .with_tool(ManageZonesTool)
         .with_tool(UpdateBedMetadataTool)
+        .with_tool(DeduplicateBedTool)
+        .with_tool(SetPlantNotesTool)
 
       # Log tool calls
       c.on_tool_call do |tool_call|
