@@ -96,6 +96,7 @@ class PlaceInZoneTool < RubyLLM::Tool
       return "Error: strategy must be 'fill', 'row', 'column', 'border', or 'center'"
     end
 
+    positions.select! { |x, y| bed.point_in_polygon?(x, y) }
     positions.each do |x, y|
       Plant.create(
         garden_id: garden_id, bed_id: bed.id,

@@ -47,6 +47,40 @@ class Bed < Sequel::Model
   def polygon?
     !canvas_points.nil?
   end
+
+  # Ray-casting point-in-polygon test.
+  # grid_x, grid_y are in 5cm grid cells. Converts to canvas coords using bounding box.
+  def point_in_polygon?(grid_x, grid_y)
+    return true unless polygon?
+    pts = canvas_points_array
+    return true if pts.length < 3
+
+    # Convert grid coords to canvas coords
+    xs = pts.map { |p| p[0] }
+    ys = pts.map { |p| p[1] }
+    min_x, max_x = xs.min, xs.max
+    min_y, max_y = ys.min, ys.max
+    poly_w = max_x - min_x
+    poly_h = max_y - min_y
+    return true if poly_w == 0 || poly_h == 0
+
+    # Cell center in canvas coords
+    cx = min_x + (grid_x * 5.0 + 2.5) * poly_w / (grid_cols * 5.0)
+    cy = min_y + (grid_y * 5.0 + 2.5) * poly_h / (grid_rows * 5.0)
+
+    # Ray-casting algorithm
+    inside = false
+    j = pts.length - 1
+    pts.length.times do |i|
+      xi, yi = pts[i]
+      xj, yj = pts[j]
+      if ((yi > cy) != (yj > cy)) && (cx < (xj - xi) * (cy - yi) / (yj - yi) + xi)
+        inside = !inside
+      end
+      j = i
+    end
+    inside
+  end
 end
 
 class Arch < Sequel::Model

@@ -52,6 +52,7 @@ class PlaceFillTool < RubyLLM::Tool
       while x + gw <= to_x
         overlap = (x...(x + gw)).any? { |cx| (y...(y + gh)).any? { |cy| occupied.include?([cx, cy]) } }
         unless overlap
+          next unless bed.point_in_polygon?(x, y)
           Plant.create(
             garden_id: garden_id, bed_id: bed.id,
             variety_name: variety_name, crop_type: crop_type, source: source,

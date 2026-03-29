@@ -27,6 +27,7 @@ class PlaceRowTool < RubyLLM::Tool
     n.times do |i|
       x = i * step
       break if x + gw > bed.grid_cols
+      next unless bed.point_in_polygon?(x, y)
 
       Plant.create(
         garden_id: garden_id, bed_id: bed.id,

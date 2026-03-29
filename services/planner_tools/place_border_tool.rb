@@ -71,6 +71,7 @@ class PlaceBorderTool < RubyLLM::Tool
     end
 
     positions.uniq!
+    positions.select! { |x, y| bed.point_in_polygon?(x, y) }
     positions.each do |x, y|
       Plant.create(
         garden_id: garden_id, bed_id: bed.id,
