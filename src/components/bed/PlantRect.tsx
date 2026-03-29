@@ -236,6 +236,41 @@ const PlantRect = memo(function PlantRect({
           {displayName}
         </text>
       )}
+      {plant.quantity > 1 && pw >= 10 && (
+        <g>
+          <circle
+            cx={px + pw - 4}
+            cy={py + 4}
+            r={3.5}
+            fill={color}
+            fillOpacity={0.8}
+          />
+          <text
+            x={px + pw - 4}
+            y={py + 4}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={4}
+            fontWeight={700}
+            fill="white"
+            style={{ pointerEvents: 'none', userSelect: 'none' }}
+          >
+            {plant.quantity > 99 ? '99+' : plant.quantity}
+          </text>
+        </g>
+      )}
+      {'notes' in plant && plant.notes && pw >= 10 && (
+        <text
+          x={px + pw - 3}
+          y={py + ph - 3}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={5}
+          style={{ pointerEvents: 'none', userSelect: 'none' }}
+        >
+          💬
+        </text>
+      )}
     </g>
   )
 })
