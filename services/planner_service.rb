@@ -56,6 +56,12 @@ class PlannerService
       4. For crops that benefit from succession (lettuce, radish, beans), set up schedules
       5. Create sowing tasks with dates appropriate for Prague climate
 
+      IMPORTANT: When the user asks to plan multiple beds (e.g., "plan empty beds",
+      "fill all beds", "plan the whole garden"), include assignments for ALL relevant
+      beds in a SINGLE draft_plan call. Do NOT plan just one bed and wait — cover
+      every bed that matches the request. A bed is "empty" if it has 0 plants.
+      A bed is "underused" if it has significant free grid space.
+
       When ready, call draft_plan with the structured data. Keep it conversational —
       discuss the plan with the user, explain your reasoning, and iterate on feedback.
 
