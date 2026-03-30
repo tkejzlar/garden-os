@@ -276,8 +276,8 @@ export function GardenDesigner() {
           {bed.name}
         </text>
 
-        {/* Plant dots when selected */}
-        {isSelected && bed.plants && bed.plants.length > 0 && (
+        {/* Plant dots — always visible, more subtle on non-selected beds */}
+        {bed.plants && bed.plants.length > 0 && (
           <>
             {bed.plants.map((plant, i) => {
               const cellW = bw / (bed.grid_cols || 1)
@@ -299,9 +299,9 @@ export function GardenDesigner() {
                   cy={dotY}
                   r={Math.min(cellW, cellH) * 0.3}
                   fill={dotColor}
-                  fillOpacity={0.8}
+                  fillOpacity={isSelected ? 0.9 : 0.5}
                   stroke="#fff"
-                  strokeWidth={1}
+                  strokeWidth={isSelected ? 1 : 0.5}
                   style={{ pointerEvents: 'none' }}
                 />
               )

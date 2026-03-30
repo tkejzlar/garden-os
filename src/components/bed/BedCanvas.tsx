@@ -219,6 +219,22 @@ export default function BedCanvas({
     )
   }
 
+  // Front edge indicator
+  const frontLabel = (
+    <text
+      x={w / 2}
+      y={3}
+      textAnchor="middle"
+      dominantBaseline="hanging"
+      fontSize={Math.min(6, w * 0.05)}
+      fill="rgba(0,0,0,0.15)"
+      fontWeight={600}
+      style={{ pointerEvents: 'none', userSelect: 'none', letterSpacing: '1px' }}
+    >
+      front
+    </text>
+  )
+
   // Build grid lines (every 2 cells = 10cm)
   const gridLines: React.ReactNode[] = []
   const gridStep = 2
@@ -301,6 +317,9 @@ export default function BedCanvas({
 
       {/* Bed outline */}
       {outlineEl}
+
+      {/* Front edge label */}
+      {frontLabel}
 
       {/* Grid lines, drop target, and plants clipped to bed shape */}
       <g clipPath={clipId ? `url(#${clipId})` : undefined}>

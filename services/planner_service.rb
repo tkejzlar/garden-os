@@ -10,6 +10,8 @@ require_relative "planner_tools/get_weather_tool"
 require_relative "planner_tools/draft_plan_tool"
 require_relative "planner_tools/draft_bed_layout_tool"
 require_relative "planner_tools/request_feature_tool"
+require_relative "planner_tools/check_feature_requests_tool"
+require_relative "planner_tools/resolve_feature_request_tool"
 require_relative "planner_tools/clear_bed_tool"
 require_relative "planner_tools/remove_plants_tool"
 require_relative "planner_tools/move_plant_tool"
@@ -175,9 +177,12 @@ class PlannerService
       already on target beds. If duplicates exist, mention them and ask whether
       to replace (clear first) or add more.
 
-      SELF-REPORTING: If the user asks you to do something you lack a tool for,
-      call request_feature to log it. Tell the user: "I can't do that yet —
-      I've logged a feature request for [capability]."
+      SELF-REPORTING: Before logging a new feature request, use
+      check_feature_requests to see what's already logged. Don't log
+      duplicates. When you notice a capability has been implemented,
+      use resolve_feature_request to mark it resolved. If the user asks
+      you to do something you lack a tool for, call request_feature to
+      log it and tell the user.
 
       Prague climate:
       - Indoor sowing: Feb-April (peppers early Feb, tomatoes early March)
@@ -202,6 +207,8 @@ class PlannerService
         .with_tool(DraftPlanTool)
         .with_tool(DraftBedLayoutTool)
         .with_tool(RequestFeatureTool)
+        .with_tool(CheckFeatureRequestsTool)
+        .with_tool(ResolveFeatureRequestTool)
         .with_tool(ClearBedTool)
         .with_tool(RemovePlantsTool)
         .with_tool(MovePlantTool)

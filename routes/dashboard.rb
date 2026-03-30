@@ -61,7 +61,25 @@ class GardenApp
       data
     end.sort_by { |r| r["timestamp"] || "" }.reverse
 
+    # Filter by status (default: show only open)
+    unless params[:status] == "all"
+      requests = requests.select { |r| r["status"] != "resolved" }
+    end
+
     json(requests)
+  end
+
+  patch "/api/feature-requests/:file/resolve" do
+    gaps_dir = File.join(settings.root, "docs", "gaps")
+    filepath = File.join(gaps_dir, params[:file])
+    halt 404, json(error: "Not found") unless File.exist?(filepath)
+
+    require "yaml"
+    data = YAML.safe_load(File.read(filepath))
+    data["status"] = "resolved"
+    data["resolved_at"] = Time.now.iso8601
+    File.write(filepath, YAML.dump(data))
+    json(ok: true, file: params[:file])
   end
 
   delete "/api/feature-requests/duplicates" do
@@ -75,7 +93,7 @@ class GardenApp
     seen = {}
     removed = 0
 
-    files.sort.each do |f|
+    files.sort.reverse.each do |f|
       data = YAML.safe_load(File.read(f))
       key = data["summary"].to_s.downcase.strip
       if seen[key]

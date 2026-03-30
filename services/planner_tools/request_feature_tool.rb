@@ -1,4 +1,5 @@
 require "ruby_llm"
+require "yaml"
 require_relative "../garden_logger"
 
 class RequestFeatureTool < RubyLLM::Tool
@@ -21,6 +22,16 @@ class RequestFeatureTool < RubyLLM::Tool
         )
       end
       return "Logged #{items.length} feature requests."
+    end
+
+    # Check for existing request with same summary
+    gaps_dir = File.join(File.dirname(__FILE__), "..", "..", "docs", "gaps")
+    if File.directory?(gaps_dir)
+      existing = Dir.glob(File.join(gaps_dir, "*-feature-request.yml")).any? do |f|
+        data = YAML.safe_load(File.read(f)) rescue {}
+        data["summary"].to_s.downcase.strip == capability.to_s.downcase.strip && data["status"] != "resolved"
+      end
+      return "Feature request '#{capability}' already logged — skipping duplicate." if existing
     end
 
     GardenLogger.record_gap!(
