@@ -32,6 +32,7 @@ require_relative "planner_tools/group_edit_tool"
 require_relative "planner_tools/place_band_tool"
 require_relative "planner_tools/copy_layout_tool"
 require_relative "planner_tools/get_empty_space_tool"
+require_relative "planner_tools/draft_variants_tool"
 
 class PlannerService
   attr_reader :last_draft
@@ -127,6 +128,9 @@ class PlannerService
       - place_band: Wide seed-row or block for broadcast-sown crops (radish, mesclun)
       - copy_layout: Copy or mirror (horizontal/vertical) a bed layout to another bed
       - get_empty_space: Report empty space percentage and largest gaps on a bed
+      - draft_variants: Present 2-3 alternative layouts for the user to compare
+        and choose from. Use when the user wants options or you have multiple
+        good approaches. Each variant has a name, description, and assignments.
 
       POLYGON BEDS: Placement tools automatically skip cells outside polygon
       bed shapes. You don't need to worry about this — just place normally
@@ -212,6 +216,7 @@ class PlannerService
         .with_tool(PlaceBandTool)
         .with_tool(CopyLayoutTool)
         .with_tool(GetEmptySpaceTool)
+        .with_tool(DraftVariantsTool)
 
       # Log tool calls
       c.on_tool_call do |tool_call|
@@ -303,6 +308,8 @@ class PlannerService
 
     Thread.current[:planner_draft] = nil
     Thread.current[:planner_bed_layout] = nil
+    Thread.current[:planner_variants] = nil
+    Thread.current[:planner_needs_refresh] = nil
     @tool_calls = []
     full_content = ""
 
@@ -325,6 +332,7 @@ class PlannerService
     # Send draft/bed_layout as final events if present
     block.call({ type: "draft", draft: @last_draft }) if @last_draft && block
     block.call({ type: "bed_layout", bed_layout: @last_bed_layout }) if @last_bed_layout && block
+    block.call({ type: "variants", variants: Thread.current[:planner_variants] }) if Thread.current[:planner_variants] && block
     block.call({ type: "refresh" }) if Thread.current[:planner_needs_refresh] && block
 
     # Save to DB

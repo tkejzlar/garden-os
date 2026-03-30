@@ -22,6 +22,14 @@ interface BedLayout {
   moves?: Array<{ plant_id: number; grid_x: number; grid_y: number }>
 }
 
+interface LayoutVariant {
+  name: string
+  description?: string
+  assignments?: Array<{ bed_name: string; variety_name: string; crop_type: string }>
+  successions?: Array<{ crop_type: string; interval_days: number; total_sowings: number }>
+  tasks?: Array<{ title: string; due_date: string }>
+}
+
 interface AIDrawerProps {
   context?: Record<string, unknown>
   onClose: () => void
@@ -51,6 +59,8 @@ export function AIDrawer({ context, onClose, open, onDraftApplied }: AIDrawerPro
   const [streamContent, setStreamContent] = useState('')
   const [draft, setDraft] = useState<DraftPlan | null>(null)
   const [bedLayout, setBedLayout] = useState<BedLayout | null>(null)
+  const [variants, setVariants] = useState<LayoutVariant[] | null>(null)
+  const [selectedVariant, setSelectedVariant] = useState(0)
   const [committing, setCommitting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -79,6 +89,8 @@ export function AIDrawer({ context, onClose, open, onDraftApplied }: AIDrawerPro
     setStreamContent('')
     setDraft(null)
     setBedLayout(null)
+    setVariants(null)
+    setSelectedVariant(0)
 
     let fullContent = ''
 
@@ -90,6 +102,9 @@ export function AIDrawer({ context, onClose, open, onDraftApplied }: AIDrawerPro
         setDraft(event.draft as DraftPlan)
       } else if (event.type === 'bed_layout') {
         setBedLayout(event.bed_layout as BedLayout)
+      } else if (event.type === 'variants') {
+        setVariants(event.variants as LayoutVariant[])
+        setSelectedVariant(0)
       } else if (event.type === 'refresh') {
         onDraftApplied?.()
       } else if (event.type === 'error') {
@@ -291,6 +306,53 @@ export function AIDrawer({ context, onClose, open, onDraftApplied }: AIDrawerPro
                   {committing ? <Loader2 size={14} className="animate-spin" /> : 'Apply layout'}
                 </button>
                 <button onClick={() => setBedLayout(null)} className="btn-ghost text-xs py-2 px-3 min-h-0">Dismiss</button>
+              </div>
+            </div>
+          )}
+
+          {/* Layout variants card */}
+          {variants && variants.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+              <h4 className="text-sm font-semibold text-amber-800 mb-3 flex items-center gap-1.5">
+                <CheckCircle size={14} /> Compare {variants.length} layout options
+              </h4>
+              <div className="flex gap-1 mb-3">
+                {variants.map((v, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedVariant(i)}
+                    className={`text-xs px-3 py-1.5 rounded-lg transition-all ${
+                      selectedVariant === i
+                        ? 'bg-amber-600 text-white'
+                        : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                    }`}
+                  >
+                    {v.name || `Option ${i + 1}`}
+                  </button>
+                ))}
+              </div>
+              <div className="text-xs text-amber-700 space-y-1 mb-3">
+                {variants[selectedVariant]?.description && (
+                  <p className="italic">{variants[selectedVariant].description}</p>
+                )}
+                {variants[selectedVariant]?.assignments && (
+                  <p>{variants[selectedVariant].assignments!.length} plant assignments</p>
+                )}
+                {variants[selectedVariant]?.tasks && variants[selectedVariant].tasks!.length > 0 && (
+                  <p>{variants[selectedVariant].tasks!.length} tasks</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setDraft(variants[selectedVariant])
+                    setVariants(null)
+                  }}
+                  className="btn-primary text-xs py-2 px-4 min-h-0"
+                >
+                  Use this layout
+                </button>
+                <button onClick={() => setVariants(null)} className="btn-ghost text-xs py-2 px-3 min-h-0">Dismiss</button>
               </div>
             </div>
           )}
