@@ -8,7 +8,7 @@ class PlaceColumnTool < RubyLLM::Tool
   param :bed_name, type: :string, desc: "Exact bed name"
   param :variety_name, type: :string, desc: "Variety to plant"
   param :crop_type, type: :string, desc: "Crop type"
-  param :col_x, type: :string, desc: "Grid column position (0 = left edge)"
+  param :col_x, type: :string, desc: "Grid column position: number, or 'left', 'right', 'middle'"
   param :count, type: :string, desc: "Number of plants"
   param :spacing, type: :string, desc: "Grid cells between plants (optional, uses crop default)"
   param :source, type: :string, desc: "Seed source (optional)"
@@ -21,7 +21,7 @@ class PlaceColumnTool < RubyLLM::Tool
     gw, gh = Plant.default_grid_size(crop_type)
     step = spacing ? spacing.to_i : gh
     n = count.to_i
-    x = col_x.to_i
+    x = bed.resolve_col(col_x)
 
     created = 0
     n.times do |i|

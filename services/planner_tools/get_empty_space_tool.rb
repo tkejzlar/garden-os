@@ -37,7 +37,9 @@ class GetEmptySpaceTool < RubyLLM::Tool
       lines << "Largest gaps:"
       gaps.first(5).each do |g|
         area = g[:w] * g[:h]
+        fits = suggest_crops(g[:w], g[:h])
         lines << "  (#{g[:x]},#{g[:y]})→(#{g[:x] + g[:w]},#{g[:y] + g[:h]}): #{area} cells (#{g[:w]}x#{g[:h]})"
+        lines << "    Could fit: #{fits}" if fits
       end
     end
 
@@ -45,6 +47,18 @@ class GetEmptySpaceTool < RubyLLM::Tool
   end
 
   private
+
+  def suggest_crops(gap_w, gap_h)
+    suggestions = []
+    crops = { "tomato" => [6,6], "pepper" => [6,6], "lettuce" => [4,4], "radish" => [2,2],
+              "carrot" => [2,2], "onion" => [2,2], "herb" => [4,4], "bean" => [4,4],
+              "squash" => [8,8], "zucchini" => [6,8], "flower" => [4,4], "spinach" => [2,4] }
+    crops.each do |crop, (cw, ch)|
+      count = (gap_w / cw) * (gap_h / ch)
+      suggestions << "#{count} #{crop}" if count >= 1
+    end
+    suggestions.empty? ? nil : suggestions.sort_by { |s| -s.split(" ").first.to_i }.first(4).join(", ")
+  end
 
   def find_gaps(cols, rows, occupied)
     # Build boolean grid (true = free)

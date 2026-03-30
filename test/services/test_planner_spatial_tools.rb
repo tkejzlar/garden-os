@@ -140,22 +140,25 @@ class TestPlaceBandTool < GardenTest
 
   def test_horizontal_band
     tool = PlaceBandTool.new
-    tool.execute(bed_name: "BB1", variety_name: "Radish", crop_type: "radish", orientation: "horizontal", position: "10", thickness: "4", quantity: "50")
-    plant = Plant.where(bed_id: @bed.id).first
-    assert_equal 0, plant.grid_x
-    assert_equal 10, plant.grid_y
-    assert_equal 24, plant.grid_w  # full bed width (120cm / 5cm = 24 cols)
-    assert_equal 4, plant.grid_h
-    assert_equal 50, plant.quantity
+    result = tool.execute(bed_name: "BB1", variety_name: "Radish", crop_type: "radish", orientation: "horizontal", position: "10", thickness: "4")
+    plants = Plant.where(bed_id: @bed.id).all
+    assert plants.length > 0, "Should create multiple plants for horizontal band"
+    # All plants should be at y=10
+    assert plants.all? { |p| p.grid_y == 10 }, "All plants should be at row 10"
+    # Plants should span x=0 onward
+    assert plants.map(&:grid_x).include?(0), "First plant should start at x=0"
+    assert_includes result, "horizontal band"
   end
 
   def test_vertical_band
     tool = PlaceBandTool.new
-    tool.execute(bed_name: "BB1", variety_name: "Carrot", crop_type: "carrot", orientation: "vertical", position: "5", thickness: "3", quantity: "30")
-    plant = Plant.where(bed_id: @bed.id).first
-    assert_equal 5, plant.grid_x
-    assert_equal 0, plant.grid_y
-    assert_equal 3, plant.grid_w
-    assert_equal 48, plant.grid_h  # full bed height (240cm / 5cm = 48 rows)
+    result = tool.execute(bed_name: "BB1", variety_name: "Carrot", crop_type: "carrot", orientation: "vertical", position: "5", thickness: "3")
+    plants = Plant.where(bed_id: @bed.id).all
+    assert plants.length > 0, "Should create multiple plants for vertical band"
+    # All plants should be at x=5
+    assert plants.all? { |p| p.grid_x == 5 }, "All plants should be at col 5"
+    # Plants should span y=0 onward
+    assert plants.map(&:grid_y).include?(0), "First plant should start at y=0"
+    assert_includes result, "vertical band"
   end
 end

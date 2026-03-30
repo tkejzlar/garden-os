@@ -13,16 +13,28 @@ class DraftVariantsTool < RubyLLM::Tool
     variants = parsed["variants"]
     return "Error: provide a 'variants' array with 2-3 options" unless variants.is_a?(Array) && variants.length >= 2
 
+    garden_id = Thread.current[:current_garden_id]
     Thread.current[:planner_variants] = variants
 
+    # Validate each variant
     summaries = variants.map.with_index do |v, i|
       a = v["assignments"]&.length || 0
       s = v["successions"]&.length || 0
       t = v["tasks"]&.length || 0
-      "#{i + 1}. #{v['name']}: #{a} plants, #{s} successions, #{t} tasks"
+      warnings = []
+
+      # Check bed references exist
+      (v["assignments"] || []).each do |asn|
+        bed = Bed.where(name: asn["bed_name"], garden_id: garden_id).first
+        warnings << "bed '#{asn['bed_name']}' not found" unless bed
+      end
+
+      line = "#{i + 1}. #{v['name']}: #{a} plants, #{s} successions, #{t} tasks"
+      line += " [WARNINGS: #{warnings.join('; ')}]" if warnings.any?
+      line
     end
 
-    "#{variants.length} layout variants stored. Present these options to the user:\n#{summaries.join("\n")}\nThe user will see cards for each variant and can pick one to apply."
+    "#{variants.length} layout variants stored:\n#{summaries.join("\n")}\nThe user will see cards for each variant and can pick one to apply."
   rescue JSON::ParserError => e
     "Error: Invalid JSON. #{e.message}"
   end

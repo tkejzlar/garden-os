@@ -48,6 +48,32 @@ class Bed < Sequel::Model
     !canvas_points.nil?
   end
 
+  # Resolve semantic position to grid coordinate.
+  # "front" = row 0 by default, but if front_edge is set, may flip.
+  # For now: front=low y, back=high y. Left=low x, right=high x.
+  # If front_edge is "north" and bed is oriented top=north, front stays at y=0.
+  # Convention: grid y=0 is always the front_edge side; y=max is the back.
+  # The AI should place tall crops at high y (back) and short at low y (front).
+  def resolve_row(semantic)
+    case semantic.to_s.downcase
+    when "front" then 0
+    when "back" then grid_rows - 1
+    when "middle", "center" then grid_rows / 2
+    when /\A\d+\z/ then semantic.to_i
+    else semantic.to_i
+    end
+  end
+
+  def resolve_col(semantic)
+    case semantic.to_s.downcase
+    when "left" then 0
+    when "right" then grid_cols - 1
+    when "middle", "center" then grid_cols / 2
+    when /\A\d+\z/ then semantic.to_i
+    else semantic.to_i
+    end
+  end
+
   # Ray-casting point-in-polygon test.
   # grid_x, grid_y are in 5cm grid cells. Converts to canvas coords using bounding box.
   def point_in_polygon?(grid_x, grid_y)

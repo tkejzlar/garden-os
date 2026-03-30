@@ -8,7 +8,7 @@ class PlaceRowTool < RubyLLM::Tool
   param :bed_name, type: :string, desc: "Exact bed name"
   param :variety_name, type: :string, desc: "Variety to plant"
   param :crop_type, type: :string, desc: "Crop type (e.g., lettuce, tomato)"
-  param :row_y, type: :string, desc: "Grid row position (0 = top/front of bed)"
+  param :row_y, type: :string, desc: "Grid row position: number, or 'front', 'back', 'middle'"
   param :count, type: :string, desc: "Number of plants to place"
   param :spacing, type: :string, desc: "Grid cells between plants (optional, uses crop default)"
   param :source, type: :string, desc: "Seed source (optional)"
@@ -21,7 +21,7 @@ class PlaceRowTool < RubyLLM::Tool
     gw, gh = Plant.default_grid_size(crop_type)
     step = spacing ? spacing.to_i : gw
     n = count.to_i
-    y = row_y.to_i
+    y = bed.resolve_row(row_y)
 
     created = 0
     n.times do |i|

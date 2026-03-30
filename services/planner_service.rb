@@ -108,6 +108,10 @@ class PlannerService
       2. Then use draft_plan or draft_bed_layout to add new ones
       3. Check for duplicates before adding
 
+      After placing plants with layout tools, you can immediately use
+      align_plants, group_edit, or update_plant to fine-tune positions.
+      Layout tools create "seed_packet" plants that are fully editable.
+
       LAYOUT TOOLS: For precise, intentional bed designs:
       - place_row: Horizontal row of plants (e.g., row of lettuce across front)
       - place_column: Vertical column (e.g., tomatoes up the back)
