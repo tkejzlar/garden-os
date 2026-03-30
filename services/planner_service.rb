@@ -33,6 +33,7 @@ require_relative "planner_tools/place_band_tool"
 require_relative "planner_tools/copy_layout_tool"
 require_relative "planner_tools/get_empty_space_tool"
 require_relative "planner_tools/draft_variants_tool"
+require_relative "planner_tools/get_garden_overview_tool"
 
 class PlannerService
   attr_reader :last_draft
@@ -104,8 +105,9 @@ class PlannerService
       with the user before bulk destructive operations like clear_bed.
 
       When redesigning a bed:
-      1. First clear or remove unwanted plants
-      2. Then use draft_plan or draft_bed_layout to add new ones
+      1. Include "mode": "replace" in draft_plan to auto-clear target beds, OR
+         manually clear/remove plants first
+      2. Then add new plants via draft_plan or layout tools
       3. Check for duplicates before adding
 
       After placing plants with layout tools, you can immediately use
@@ -113,6 +115,8 @@ class PlannerService
       Layout tools create "seed_packet" plants that are fully editable.
 
       LAYOUT TOOLS: For precise, intentional bed designs:
+      - get_garden_overview: High-level overview of all beds — plant counts, empty %, crop summaries
+
       - place_row: Horizontal row of plants (e.g., row of lettuce across front)
       - place_column: Vertical column (e.g., tomatoes up the back)
       - place_single: One plant at exact position (e.g., courgette in corner)
@@ -221,6 +225,7 @@ class PlannerService
         .with_tool(CopyLayoutTool)
         .with_tool(GetEmptySpaceTool)
         .with_tool(DraftVariantsTool)
+        .with_tool(GetGardenOverviewTool)
 
       # Log tool calls
       c.on_tool_call do |tool_call|

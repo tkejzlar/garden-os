@@ -64,6 +64,31 @@ class GardenApp
     json(requests)
   end
 
+  delete "/api/feature-requests/duplicates" do
+    gaps_dir = File.join(settings.root, "docs", "gaps")
+    unless File.directory?(gaps_dir)
+      return json(removed: 0)
+    end
+
+    require "yaml"
+    files = Dir.glob(File.join(gaps_dir, "*-feature-request.yml"))
+    seen = {}
+    removed = 0
+
+    files.sort.each do |f|
+      data = YAML.safe_load(File.read(f))
+      key = data["summary"].to_s.downcase.strip
+      if seen[key]
+        File.delete(f)
+        removed += 1
+      else
+        seen[key] = f
+      end
+    end
+
+    json(removed: removed)
+  end
+
   private
 
   def sensor_vars_configured?

@@ -7,7 +7,7 @@ require_relative "task_generator"
 require_relative "garden_logger"
 
 class PlanCommitter
-  def self.commit!(draft, garden_id: nil)
+  def self.commit!(draft, garden_id: nil, mode: "add")
     assignments = draft["assignments"] || []
     successions = draft["successions"] || []
     tasks       = draft["tasks"] || []
@@ -18,6 +18,14 @@ class PlanCommitter
     # Validate bed references
     errors = validate_beds(assignments, tasks)
     return { success: false, errors: errors } if errors.any?
+
+    if mode == "replace"
+      bed_names = (assignments.map { |a| a["bed_name"] }).compact.uniq
+      bed_names.each do |name|
+        bed = Bed.where(name: name, garden_id: garden_id).first
+        Plant.where(bed_id: bed.id).exclude(lifecycle_stage: "done").all.each(&:destroy) if bed
+      end
+    end
 
     counts = { plants: 0, succession_plans: 0, tasks: 0 }
 

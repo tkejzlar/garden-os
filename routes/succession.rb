@@ -377,7 +377,8 @@ class GardenApp
     halt 400, json(error: "draft_payload required") unless draft.is_a?(Hash) && (draft["assignments"] || draft["tasks"] || draft["successions"])
 
     require_relative "../services/plan_committer"
-    result = PlanCommitter.commit!(draft, garden_id: @current_garden.id)
+    mode = draft.delete("mode") || "add"
+    result = PlanCommitter.commit!(draft, garden_id: @current_garden.id, mode: mode)
     json result
   end
 
@@ -443,7 +444,8 @@ class GardenApp
     halt 400, json(error: "draft_payload required") unless draft.is_a?(Hash) && (draft["assignments"] || draft["tasks"] || draft["successions"])
 
     require_relative "../services/plan_committer"
-    result = PlanCommitter.commit!(draft, garden_id: @current_garden.id)
+    mode = draft.delete("mode") || "add"
+    result = PlanCommitter.commit!(draft, garden_id: @current_garden.id, mode: mode)
     json result
   end
 end

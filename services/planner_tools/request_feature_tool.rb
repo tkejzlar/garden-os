@@ -7,8 +7,22 @@ class RequestFeatureTool < RubyLLM::Tool
   param :action, type: :string, desc: "What the user wanted to do (e.g., 'move tomato from BB1 to SB2')"
   param :capability, type: :string, desc: "What tool/capability is missing (e.g., 'move_plant_between_beds')"
   param :context, type: :string, desc: "Brief context on why this would be valuable"
+  param :batch, type: :string, desc: "Optional JSON array of {action, capability, context} objects to log multiple requests at once"
 
-  def execute(action:, capability:, context:)
+  def execute(action: nil, capability: nil, context: nil, batch: nil)
+    if batch
+      items = JSON.parse(batch) rescue []
+      items.each do |item|
+        GardenLogger.record_gap!(
+          category: "feature-request",
+          summary: item["capability"] || item["summary"],
+          detail: item["action"] || item["detail"],
+          context: { reason: item["context"] || item["reason"], source: "ai-planner", requested_at: Time.now.iso8601 }
+        )
+      end
+      return "Logged #{items.length} feature requests."
+    end
+
     GardenLogger.record_gap!(
       category: "feature-request",
       summary: capability,
