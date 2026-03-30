@@ -200,15 +200,15 @@ const PlantRect = memo(function PlantRect({
       data-plant-id={plant.id}
     >
       <rect
-        x={px + 0.5}
-        y={py + 0.5}
-        width={pw - 1}
-        height={ph - 1}
+        x={px + 1}
+        y={py + 1}
+        width={pw - 2}
+        height={ph - 2}
         rx={2}
         fill={color}
-        fillOpacity={0.25}
+        fillOpacity={0.22}
         stroke={color}
-        strokeWidth={selected ? 2 : 1}
+        strokeWidth={selected ? 2 : 1.2}
         filter={selected ? `url(#${SELECTED_FILTER_ID})` : undefined}
       />
       <text
