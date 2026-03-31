@@ -72,7 +72,7 @@ class RequestFeatureTool < RubyLLM::Tool
     norm = normalize(summary)
     # Exact match or significant word overlap
     existing.any? do |ex|
-      norm == ex || word_overlap(norm, ex) >= 0.6
+      norm == ex || word_overlap(norm, ex) >= 0.75
     end
   end
 

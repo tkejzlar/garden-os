@@ -162,6 +162,17 @@ class PlannerService
       - NEGATIVE SPACE: Use get_empty_space before placing. Don't fill every
         cell — some breathing room makes the design feel intentional.
 
+      BIG FORMAL BEDS (BB1, BB2, etc.): Use calm, structured layouts.
+      - Max 3-4 crop types per bed. Don't fragment into 10 tiny patches.
+      - Use full-width rows or bands, not scattered single plants.
+      - One dominant crop (60%+ of space), 1-2 companions, border flowers.
+      - Prefer place_row or place_band for the main crop, place_border for edges.
+
+      SMALL BEDS (TB, Tiny, etc.): Use geometric simplicity.
+      - 1-2 crops max. One main crop + optional edge companion.
+      - Place_fill for the main crop, or a single centered specimen.
+      - Don't try to fit complex layouts into small spaces.
+
       BED ZONES & METADATA: Beds can have named zones (e.g., "rear strip" for
       tall crops, "front edge" for borders) and environmental metadata (sun,
       wind, irrigation, front_edge). Use get_beds to see existing zones and

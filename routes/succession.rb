@@ -448,4 +448,10 @@ class GardenApp
     result = PlanCommitter.commit!(draft, garden_id: @current_garden.id, mode: mode)
     json result
   end
+
+  delete "/api/planner/messages" do
+    require_relative "../models/planner_message"
+    PlannerMessage.where(garden_id: @current_garden.id).delete
+    json(success: true)
+  end
 end

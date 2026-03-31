@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Sparkles, X, Send, Loader2, CheckCircle } from 'lucide-react'
+import { Sparkles, X, Send, Loader2, CheckCircle, Trash2 } from 'lucide-react'
 import { renderMarkdown } from '../lib/markdown'
 import { streamPlanner, type SSEEvent } from '../lib/api'
 import { toast } from '../lib/toast'
@@ -63,8 +63,29 @@ export function AIDrawer({ context, onClose, open, onDraftApplied }: AIDrawerPro
   const [selectedVariant, setSelectedVariant] = useState(0)
   const [committing, setCommitting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<(() => void) | null>(null)
+
+  const clearThread = useCallback(async () => {
+    try {
+      await fetch('/api/planner/messages', { method: 'DELETE' })
+      setMessages([])
+      setDraft(null)
+      setBedLayout(null)
+      setVariants(null)
+      sessionStorage.removeItem('ai_chat')
+      toast.success('Chat cleared')
+    } catch {
+      toast.error('Failed to clear chat')
+    }
+  }, [])
+
+  const resizeTextarea = useCallback(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+  }, [])
 
   // Persist chat to sessionStorage
   useEffect(() => {
@@ -185,8 +206,8 @@ export function AIDrawer({ context, onClose, open, onDraftApplied }: AIDrawerPro
       <div className="absolute inset-0 bg-green-900/30 backdrop-blur-sm" onClick={onClose} />
 
       <div
-        className="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
-        style={{ maxHeight: '80dvh', animation: 'slideUp 250ms ease-out' }}
+        className="relative w-full sm:max-w-2xl bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ maxHeight: '90dvh', animation: 'slideUp 250ms ease-out' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
@@ -201,9 +222,16 @@ export function AIDrawer({ context, onClose, open, onDraftApplied }: AIDrawerPro
               <p className="text-xs text-[var(--color-muted)]">Companion planting & bed planning</p>
             </div>
           </div>
-          <button onClick={onClose} className="btn-ghost p-2 min-h-0 min-w-0">
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            {messages.length > 0 && (
+              <button onClick={clearThread} className="btn-ghost p-2 min-h-0 min-w-0" title="Clear chat">
+                <Trash2 size={16} className="text-[var(--color-muted)]" />
+              </button>
+            )}
+            <button onClick={onClose} className="btn-ghost p-2 min-h-0 min-w-0">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -362,15 +390,16 @@ export function AIDrawer({ context, onClose, open, onDraftApplied }: AIDrawerPro
 
         {/* Input */}
         <div className="px-4 py-3 border-t border-[var(--color-border)] bg-white">
-          <div className="flex items-center gap-2">
-            <input
+          <div className="flex items-end gap-2">
+            <textarea
               ref={inputRef}
-              type="text"
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={e => { setInput(e.target.value); resizeTextarea() }}
               onKeyDown={handleKeyDown}
               placeholder="Ask about your garden..."
-              className="flex-1 px-4 py-3 rounded-xl border border-[var(--color-border)] text-sm bg-gray-50 focus:bg-white focus:border-[var(--color-primary-light)] outline-none transition-all"
+              rows={1}
+              className="flex-1 px-4 py-3 rounded-xl border border-[var(--color-border)] text-sm bg-gray-50 focus:bg-white focus:border-[var(--color-primary-light)] outline-none transition-all resize-none"
+              style={{ maxHeight: 120 }}
               disabled={streaming}
             />
             <button
