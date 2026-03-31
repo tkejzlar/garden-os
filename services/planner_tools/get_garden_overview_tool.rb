@@ -8,27 +8,30 @@ class GetGardenOverviewTool < RubyLLM::Tool
 
   def execute
     garden_id = Thread.current[:current_garden_id]
-    beds = Bed.where(garden_id: garden_id).all.map do |bed|
+    beds = Bed.where(garden_id: garden_id).order(:position, :name).all
+
+    lines = ["## Garden Overview\n"]
+    lines << "| Bed | Plants | Empty | Top Crops |"
+    lines << "|-----|--------|-------|-----------|"
+
+    beds.each do |bed|
       plants = Plant.where(bed_id: bed.id).exclude(lifecycle_stage: "done").all
       total_cells = bed.grid_cols * bed.grid_rows
-
-      occupied = 0
-      plants.each { |p| occupied += (p.grid_w || 1) * (p.grid_h || 1) }
+      occupied = plants.sum { |p| (p.grid_w || 1) * (p.grid_h || 1) }
       empty_pct = total_cells > 0 ? (((total_cells - occupied).to_f / total_cells) * 100).round(0) : 100
 
-      crops = plants.group_by(&:crop_type).map { |ct, ps| "#{ps.length} #{ct}" }
+      crops = plants.group_by(&:crop_type).map { |ct, ps| "#{ps.length} #{ct}" }.first(3)
+      fe = (bed.respond_to?(:front_edge) ? bed.front_edge : nil)
+      bed_label = bed.name
+      bed_label += " (#{fe})" if fe
 
-      {
-        name: bed.name,
-        bed_type: bed.bed_type,
-        grid: "#{bed.grid_cols}x#{bed.grid_rows}",
-        plants: plants.length,
-        empty_pct: empty_pct,
-        crops: crops.join(", "),
-        front_edge: (bed.respond_to?(:front_edge) ? bed.front_edge : nil)
-      }
+      lines << "| #{bed_label} | #{plants.length} | #{empty_pct}% | #{crops.join(', ')} |"
     end
 
-    JSON.generate({ total_beds: beds.length, beds: beds })
+    total_plants = Plant.where(bed_id: beds.map(&:id)).exclude(lifecycle_stage: "done").count
+    total_beds = beds.length
+    lines << "\n**Total:** #{total_plants} plants across #{total_beds} beds"
+
+    lines.join("\n")
   end
 end

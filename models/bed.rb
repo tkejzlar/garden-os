@@ -55,9 +55,11 @@ class Bed < Sequel::Model
   # Convention: grid y=0 is always the front_edge side; y=max is the back.
   # The AI should place tall crops at high y (back) and short at low y (front).
   def resolve_row(semantic)
+    fe = (respond_to?(:front_edge) ? front_edge : nil).to_s.downcase
+    flip = fe == "south"
     case semantic.to_s.downcase
-    when "front" then 0
-    when "back" then grid_rows - 1
+    when "front" then flip ? grid_rows - 1 : 0
+    when "back" then flip ? 0 : grid_rows - 1
     when "middle", "center" then grid_rows / 2
     when /\A\d+\z/ then semantic.to_i
     else semantic.to_i
@@ -65,9 +67,11 @@ class Bed < Sequel::Model
   end
 
   def resolve_col(semantic)
+    fe = (respond_to?(:front_edge) ? front_edge : nil).to_s.downcase
+    flip = %w[east west].include?(fe)
     case semantic.to_s.downcase
-    when "left" then 0
-    when "right" then grid_cols - 1
+    when "left" then flip ? grid_cols - 1 : 0
+    when "right" then flip ? 0 : grid_cols - 1
     when "middle", "center" then grid_cols / 2
     when /\A\d+\z/ then semantic.to_i
     else semantic.to_i

@@ -44,6 +44,11 @@ const PlantRect = memo(function PlantRect({
   const color = getCropColor(plant.crop_type)
   const abbr = getCropAbbr(plant.crop_type)
 
+  const isRowCrop = ['radish', 'carrot', 'onion', 'spinach', 'lettuce', 'pea'].includes(
+    plant.crop_type?.toLowerCase() || ''
+  )
+  const isBandPlant = isRowCrop && (pw <= 15 || ph <= 15)
+
   // Text sizing
   const abbrFs = Math.min(pw * 0.35, ph * 0.4, 14)
   const showVariety = pw >= 15 && ph >= 12
@@ -204,11 +209,12 @@ const PlantRect = memo(function PlantRect({
         y={py + 1}
         width={pw - 2}
         height={ph - 2}
-        rx={2}
+        rx={isBandPlant ? 1 : 2}
         fill={color}
-        fillOpacity={0.22}
+        fillOpacity={isBandPlant ? 0.12 + (plant.id % 5) * 0.03 : 0.22}
         stroke={color}
-        strokeWidth={selected ? 2 : 1.2}
+        strokeWidth={selected ? 2 : (isBandPlant ? 0.5 : 1.2)}
+        strokeDasharray={isBandPlant ? '2,1' : undefined}
         filter={selected ? `url(#${SELECTED_FILTER_ID})` : undefined}
       />
       <text

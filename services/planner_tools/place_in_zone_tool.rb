@@ -38,6 +38,15 @@ class PlaceInZoneTool < RubyLLM::Tool
       end
     end
 
+    # Remap border edges based on bed front_edge orientation
+    fe = (bed.respond_to?(:front_edge) ? bed.front_edge : nil).to_s.downcase
+    border_remap = case fe
+    when "south" then { "front" => "back", "back" => "front" }
+    when "east"  then { "left" => "right", "right" => "left" }
+    when "west"  then { "left" => "right", "right" => "left" }
+    else {}
+    end
+
     positions = case strategy
     when "fill"
       pos = []

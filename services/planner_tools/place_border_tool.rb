@@ -22,6 +22,16 @@ class PlaceBorderTool < RubyLLM::Tool
     edge_list = JSON.parse(edges) rescue []
     return "Error: edges must be a JSON array" if edge_list.empty?
 
+    # Remap edges based on bed front_edge orientation
+    fe = (bed.respond_to?(:front_edge) ? bed.front_edge : nil).to_s.downcase
+    remap = case fe
+    when "south" then { "front" => "back", "back" => "front" }
+    when "east"  then { "left" => "right", "right" => "left" }
+    when "west"  then { "left" => "right", "right" => "left" }
+    else {}
+    end
+    edge_list = edge_list.map { |e| remap[e] || e }
+
     gw, gh = Plant.default_grid_size(crop_type)
     step_x = spacing ? spacing.to_i : gw
     step_y = spacing ? spacing.to_i : gh
