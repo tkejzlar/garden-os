@@ -1,5 +1,6 @@
 require "ruby_llm"
 require "yaml"
+require "set"
 require_relative "../garden_logger"
 
 class RequestFeatureTool < RubyLLM::Tool
@@ -11,27 +12,34 @@ class RequestFeatureTool < RubyLLM::Tool
   param :batch, type: :string, desc: "Optional JSON array of {action, capability, context} objects to log multiple requests at once"
 
   def execute(action: nil, capability: nil, context: nil, batch: nil)
+    existing_summaries = load_existing_summaries
+
     if batch
       items = JSON.parse(batch) rescue []
+      logged = 0
+      skipped = 0
       items.each do |item|
-        GardenLogger.record_gap!(
-          category: "feature-request",
-          summary: item["capability"] || item["summary"],
-          detail: item["action"] || item["detail"],
-          context: { reason: item["context"] || item["reason"], source: "ai-planner", requested_at: Time.now.iso8601 }
-        )
+        summary = item["capability"] || item["summary"]
+        if similar_exists?(summary, existing_summaries)
+          skipped += 1
+        else
+          GardenLogger.record_gap!(
+            category: "feature-request",
+            summary: summary,
+            detail: item["action"] || item["detail"],
+            context: { reason: item["context"] || item["reason"], source: "ai-planner", requested_at: Time.now.iso8601 }
+          )
+          existing_summaries << normalize(summary)
+          logged += 1
+        end
       end
-      return "Logged #{items.length} feature requests."
+      msg = "Logged #{logged} feature request(s)."
+      msg += " Skipped #{skipped} duplicate(s)." if skipped > 0
+      return msg
     end
 
-    # Check for existing request with same summary
-    gaps_dir = File.join(File.dirname(__FILE__), "..", "..", "docs", "gaps")
-    if File.directory?(gaps_dir)
-      existing = Dir.glob(File.join(gaps_dir, "*-feature-request.yml")).any? do |f|
-        data = YAML.safe_load(File.read(f)) rescue {}
-        data["summary"].to_s.downcase.strip == capability.to_s.downcase.strip && data["status"] != "resolved"
-      end
-      return "Feature request '#{capability}' already logged — skipping duplicate." if existing
+    if similar_exists?(capability, existing_summaries)
+      return "Feature request '#{capability}' already logged — skipping duplicate."
     end
 
     GardenLogger.record_gap!(
@@ -42,5 +50,36 @@ class RequestFeatureTool < RubyLLM::Tool
     )
 
     "Feature request logged: '#{capability}'. Let the user know you've noted this and it may be available in the future."
+  end
+
+  private
+
+  def normalize(s)
+    s.to_s.downcase.gsub(/[^a-z0-9]/, " ").squeeze(" ").strip
+  end
+
+  def load_existing_summaries
+    gaps_dir = File.join(File.dirname(__FILE__), "..", "..", "docs", "gaps")
+    return [] unless File.directory?(gaps_dir)
+    Dir.glob(File.join(gaps_dir, "*-feature-request.yml")).filter_map do |f|
+      data = YAML.safe_load(File.read(f)) rescue {}
+      next if data["status"] == "resolved"
+      normalize(data["summary"])
+    end
+  end
+
+  def similar_exists?(summary, existing)
+    norm = normalize(summary)
+    # Exact match or significant word overlap
+    existing.any? do |ex|
+      norm == ex || word_overlap(norm, ex) >= 0.6
+    end
+  end
+
+  def word_overlap(a, b)
+    wa = a.split.to_set
+    wb = b.split.to_set
+    return 0.0 if wa.empty? || wb.empty?
+    (wa & wb).size.to_f / [wa.size, wb.size].min
   end
 end
